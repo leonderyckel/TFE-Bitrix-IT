@@ -78,31 +78,24 @@ exports.register = async (req, res) => {
 // Login user
 exports.login = async (req, res) => {
   try {
-    const { User, AdminUser } = getModels();
+    const { User } = getModels();
     const { email, password } = req.body;
 
-    // Try to find user in admin database first
-    let user = await AdminUser.findOne({ email }).select('+password');
-    let isAdmin = true;
-
-    // If not found in admin database, try regular users
-    if (!user) {
-      user = await User.findOne({ email }).select('+password');
-      isAdmin = false;
-    }
+    // Chercher uniquement dans la base de données des utilisateurs réguliers
+    const user = await User.findOne({ email }).select('+password');
 
     if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Identifiants invalides' });
     }
 
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Identifiants invalides' });
     }
 
-    // Generate token
-    const token = generateToken(user._id, isAdmin);
+    // Generate token (toujours isAdmin = false pour cette route)
+    const token = generateToken(user._id, false);
 
     res.json({
       user: {
@@ -110,14 +103,13 @@ exports.login = async (req, res) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        role: isAdmin ? user.role : 'client',
-        ...(isAdmin && { permissions: user.permissions }),
-        ...(!isAdmin && { company: user.company })
+        role: 'client',
+        company: user.company
       },
       token
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error logging in', error: error.message });
+    res.status(500).json({ message: 'Erreur de connexion', error: error.message });
   }
 };
 

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Container,
@@ -7,14 +7,12 @@ import {
   Typography,
   TextField,
   Button,
-  Link,
   Alert,
-  Paper,
-  Divider
+  Paper
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
-import { login } from '../store/slices/authSlice';
+import { adminLogin } from '../store/slices/authSlice';
 
 const validationSchema = yup.object({
   email: yup
@@ -26,20 +24,16 @@ const validationSchema = yup.object({
     .required('Password is required')
 });
 
-const Login = () => {
+const AdminLogin = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading, error, isAuthenticated, user } = useSelector((state) => state.auth);
+  const { loading, error, isAuthenticated, user, isAdmin } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      if (user?.role === 'admin' || user?.role === 'technician') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
+    if (isAuthenticated && isAdmin) {
+      navigate('/admin');
     }
-  }, [isAuthenticated, navigate, user]);
+  }, [isAuthenticated, isAdmin, navigate]);
 
   const formik = useFormik({
     initialValues: {
@@ -48,8 +42,8 @@ const Login = () => {
     },
     validationSchema: validationSchema,
     onSubmit: (values) => {
-      console.log('Login attempt with:', values);
-      dispatch(login(values));
+      console.log('Admin login attempt with:', values);
+      dispatch(adminLogin(values));
     }
   });
 
@@ -70,11 +64,15 @@ const Login = () => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            width: '100%'
+            width: '100%',
+            backgroundColor: '#f5f5f5'
           }}
         >
-          <Typography component="h1" variant="h5">
-            Client Login
+          <Typography component="h1" variant="h5" sx={{ mb: 2 }}>
+            Administration
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
+            Access restricted to IT personnel
           </Typography>
           {error && (
             <Alert severity="error" sx={{ mt: 2, width: '100%' }}>
@@ -90,7 +88,7 @@ const Login = () => {
               fullWidth
               id="email"
               name="email"
-              label="Email Address"
+              label="Email address"
               value={formik.values.email}
               onChange={formik.handleChange}
               error={formik.touched.email && Boolean(formik.errors.email)}
@@ -113,29 +111,20 @@ const Login = () => {
               type="submit"
               fullWidth
               variant="contained"
+              color="primary"
               sx={{ mt: 3, mb: 2 }}
               disabled={loading}
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
-            <Box sx={{ textAlign: 'center' }}>
-              <Link component={RouterLink} to="/register" variant="body2">
-                Don't have an account? Sign up
-              </Link>
-            </Box>
-            
-            <Divider sx={{ my: 3 }} />
-            
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Are you an administrator or IT technician?
-              </Typography>
+            <Box sx={{ textAlign: 'center', mt: 2 }}>
               <Button
-                variant="outlined"
+                variant="text"
+                color="primary"
+                onClick={() => navigate('/login')}
                 size="small"
-                onClick={() => navigate('/admin/login')}
               >
-                Administrator Access
+                Back to client login
               </Button>
             </Box>
           </Box>
@@ -145,4 +134,4 @@ const Login = () => {
   );
 };
 
-export default Login; 
+export default AdminLogin; 

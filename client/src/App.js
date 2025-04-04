@@ -15,6 +15,10 @@ import TicketDetails from './pages/TicketDetails';
 import NewTicket from './pages/NewTicket';
 import AdminDashboard from './pages/AdminDashboard';
 import PrivateRoute from './components/PrivateRoute';
+import AdminTicketDetails from './pages/AdminTicketDetails';
+import AdminTicketEdit from './pages/AdminTicketEdit';
+import AdminSettings from './pages/AdminSettings';
+import AdminLogin from './pages/AdminLogin';
 
 // Create theme
 const theme = createTheme({
@@ -37,6 +41,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route 
@@ -76,6 +81,30 @@ function App() {
                 element={
                   <PrivateRoute roles={['admin', 'technician']}>
                     <AdminDashboard />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="admin/tickets/:id" 
+                element={
+                  <PrivateRoute roles={['admin', 'technician']}>
+                    <AdminTicketDetails />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="admin/tickets/:id/edit" 
+                element={
+                  <PrivateRoute roles={['admin', 'technician']}>
+                    <AdminTicketEdit />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="admin/settings" 
+                element={
+                  <PrivateRoute roles={['admin']}>
+                    <AdminSettings />
                   </PrivateRoute>
                 } 
               />

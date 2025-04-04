@@ -19,13 +19,27 @@ const auth = async (req, res, next) => {
       // Get models
       const { User, AdminUser } = getModels();
       
-      // Try to find user in both databases
-      let user = await User.findById(decoded.id).select('-password');
-      console.log('User from public database:', user ? 'Found' : 'Not found');
+      let user;
       
-      if (!user) {
-        user = await AdminUser.findById(decoded.id).select('-password');
+      // Déterminer quelle base de données vérifier en premier
+      if (decoded.isAdmin) {
+        // Si c'est un token admin, vérifier d'abord la base de données admin
+        user = await AdminUser.findById(decoded._id).select('-password');
         console.log('User from admin database:', user ? 'Found' : 'Not found');
+        
+        if (!user) {
+          user = await User.findById(decoded._id || decoded.id).select('-password');
+          console.log('User from public database:', user ? 'Found' : 'Not found');
+        }
+      } else {
+        // Si ce n'est pas un token admin, vérifier d'abord la base de données publique
+        user = await User.findById(decoded.id || decoded._id).select('-password');
+        console.log('User from public database:', user ? 'Found' : 'Not found');
+        
+        if (!user) {
+          user = await AdminUser.findById(decoded._id || decoded.id).select('-password');
+          console.log('User from admin database:', user ? 'Found' : 'Not found');
+        }
       }
       
       if (!user) {
@@ -36,6 +50,7 @@ const auth = async (req, res, next) => {
       console.log('User authenticated:', { id: user._id, role: user.role });
       req.user = user;
       req.token = token;
+      req.isAdmin = !!decoded.isAdmin;
       next();
     } catch (error) {
       console.error('Token verification error:', error);

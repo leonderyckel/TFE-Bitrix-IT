@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const ADMIN_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api/admin';
 
 // Async thunks
 export const login = createAsyncThunk(
@@ -12,6 +13,21 @@ export const login = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data);
+    }
+  }
+);
+
+export const adminLogin = createAsyncThunk(
+  'auth/adminLogin',
+  async (credentials, { rejectWithValue }) => {
+    try {
+      console.log('Trying admin login with:', credentials.email);
+      const response = await axios.post(`${ADMIN_URL}/login`, credentials);
+      console.log('Admin login response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Admin login error:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data || { message: 'Login failed' });
     }
   }
 );
@@ -32,14 +48,23 @@ export const loadUserData = createAsyncThunk(
   'auth/loadUserData',
   async (_, { rejectWithValue, getState }) => {
     try {
-      const token = getState().auth.token;
+      const { token, isAdmin } = getState().auth;
       if (!token) throw new Error('No token found');
 
-      const response = await axios.get(`${API_URL}/auth/me`, {
+      // Choisir la bonne URL en fonction de isAdmin
+      const url = isAdmin 
+        ? `${ADMIN_URL}/profile` // Endpoint admin à créer
+        : `${API_URL}/auth/me`;  // Endpoint utilisateur existant
+      
+      console.log(`Loading user data from ${isAdmin ? 'admin' : 'user'} API`);
+      
+      const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      
       return response.data;
     } catch (error) {
+      console.error('Load user data error:', error);
       return rejectWithValue(error.response?.data || { message: error.message });
     }
   }
@@ -50,7 +75,8 @@ const initialState = {
   token: localStorage.getItem('token'),
   isAuthenticated: false,
   loading: false,
-  error: null
+  error: null,
+  isAdmin: localStorage.getItem('isAdmin') === 'true'
 };
 
 const authSlice = createSlice({
@@ -63,7 +89,9 @@ const authSlice = createSlice({
       state.isAuthenticated = true;
       state.loading = false;
       state.error = null;
+      state.isAdmin = false;
       localStorage.setItem('token', action.payload.token);
+      localStorage.setItem('isAdmin', 'false');
     },
     loginFailure: (state, action) => {
       state.user = null;
@@ -71,7 +99,9 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.loading = false;
       state.error = action.payload;
+      state.isAdmin = false;
       localStorage.removeItem('token');
+      localStorage.removeItem('isAdmin');
     },
     logout: (state) => {
       state.user = null;
@@ -79,7 +109,9 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.loading = false;
       state.error = null;
+      state.isAdmin = false;
       localStorage.removeItem('token');
+      localStorage.removeItem('isAdmin');
     },
     loadUser: (state, action) => {
       state.user = action.payload;
@@ -104,11 +136,32 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.loading = false;
         state.error = null;
+        state.isAdmin = false;
         localStorage.setItem('token', action.payload.token);
+        localStorage.setItem('isAdmin', 'false');
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload?.message || 'Login failed';
+      })
+      // Admin Login
+      .addCase(adminLogin.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(adminLogin.fulfilled, (state, action) => {
+        state.user = action.payload.admin;
+        state.token = action.payload.token;
+        state.isAuthenticated = true;
+        state.loading = false;
+        state.error = null;
+        state.isAdmin = true;
+        localStorage.setItem('token', action.payload.token);
+        localStorage.setItem('isAdmin', 'true');
+      })
+      .addCase(adminLogin.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.message || 'Admin login failed';
       })
       // Register
       .addCase(register.pending, (state) => {
@@ -121,7 +174,9 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.loading = false;
         state.error = null;
+        state.isAdmin = false;
         localStorage.setItem('token', action.payload.token);
+        localStorage.setItem('isAdmin', 'false');
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
@@ -145,6 +200,7 @@ const authSlice = createSlice({
           state.isAuthenticated = false;
           state.token = null;
           localStorage.removeItem('token');
+          localStorage.removeItem('isAdmin');
         }
       });
   }

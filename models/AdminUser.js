@@ -36,6 +36,14 @@ const adminUserSchema = new mongoose.Schema({
     type: String,
     enum: ['manage_users', 'manage_tickets', 'view_analytics', 'manage_technicians']
   }],
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  lastLogin: {
+    type: Date,
+    default: Date.now
+  },
   createdAt: {
     type: Date,
     default: Date.now
