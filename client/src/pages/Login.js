@@ -15,6 +15,7 @@ import {
 import { useFormik } from 'formik';
 import * as yup from 'yup';
 import { login } from '../store/slices/authSlice';
+import Logo from '../components/Logo';
 
 const validationSchema = yup.object({
   email: yup
@@ -63,6 +64,9 @@ const Login = () => {
           alignItems: 'center'
         }}
       >
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+          <Logo width={200} />
+        </Box>
         <Paper
           elevation={3}
           sx={{

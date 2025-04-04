@@ -27,6 +27,7 @@ import {
   Person as PersonIcon
 } from '@mui/icons-material';
 import { logout } from '../store/slices/authSlice';
+import Logo from './Logo';
 
 const drawerWidth = 240;
 
@@ -68,10 +69,8 @@ const Layout = () => {
 
   const drawer = (
     <div>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div">
-          IT Support
-        </Typography>
+      <Toolbar sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+        <Logo width={150} />
       </Toolbar>
       <Divider />
       <List>
