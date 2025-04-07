@@ -12,7 +12,6 @@ import {
   ListItemIcon,
   ListItemText,
   Toolbar,
-  Typography,
   Avatar,
   Menu,
   MenuItem,
@@ -22,9 +21,9 @@ import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
   Support as SupportIcon,
-  AdminPanelSettings as AdminIcon,
   Logout as LogoutIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  People as ClientsIcon
 } from '@mui/icons-material';
 import { logout } from '../store/slices/authSlice';
 import Logo from './Logo';
@@ -36,7 +35,7 @@ const Layout = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useSelector((state) => state.auth);
+  const { user, isAuthenticated, isAdmin } = useSelector((state) => state.auth);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -61,10 +60,12 @@ const Layout = () => {
     navigate('/login');
   };
 
-  const menuItems = [
+  const menuItems = isAdmin ? [
+    { text: 'Tickets', icon: <SupportIcon />, path: '/admin' },
+    { text: 'Clients', icon: <ClientsIcon />, path: '/clients' }
+  ] : [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Tickets', icon: <SupportIcon />, path: '/tickets' },
-    ...(user?.role === 'admin' ? [{ text: 'Admin', icon: <AdminIcon />, path: '/admin' }] : [])
+    { text: 'Tickets', icon: <SupportIcon />, path: '/tickets' }
   ];
 
   const drawer = (
@@ -76,6 +77,7 @@ const Layout = () => {
       <List>
         {menuItems.map((item) => (
           <ListItem
+            button
             key={item.text}
             onClick={() => {
               navigate(item.path);
@@ -198,10 +200,10 @@ const Layout = () => {
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { sm: `calc(100% - ${drawerWidth}px)` }
+          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          mt: '64px'
         }}
       >
-        <Toolbar />
         <Outlet />
       </Box>
     </Box>
