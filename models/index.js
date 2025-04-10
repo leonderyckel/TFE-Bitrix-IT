@@ -11,12 +11,13 @@ const initializeModels = async () => {
   try {
     if (models) return models;
 
-    // Connexion à la base de données principale
-    const mainConnection = await connectDB(process.env.MONGODB_URI);
+    // Connexion à la base de données publique (Proxmox)
+    const publicUri = process.env.MONGODB_PUBLIC_URI;
+    const mainConnection = await connectDB(publicUri);
     console.log('MongoDB Public Database Connected');
 
-    // Connexion à la base de données admin (même cluster, base différente)
-    const adminUri = process.env.MONGODB_URI.replace('it-support', 'it-support-admin');
+    // Connexion à la base de données admin (MongoDB Atlas)
+    const adminUri = process.env.MONGODB_ADMIN_URI;
     const adminConnection = await connectDB(adminUri);
     console.log('MongoDB Admin Database Connected');
 
