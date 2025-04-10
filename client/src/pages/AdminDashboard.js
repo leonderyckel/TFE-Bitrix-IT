@@ -168,7 +168,7 @@ function AdminDashboard() {
                                 <VisibilityIcon />
                               </IconButton>
                               <IconButton 
-                                color="primary" 
+                                color="secondary"
                                 onClick={() => navigate(`/admin/tickets/${ticket._id}/edit`)}
                                 title="Edit Ticket"
                               >

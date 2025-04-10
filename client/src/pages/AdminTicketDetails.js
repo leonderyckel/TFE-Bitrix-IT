@@ -3,7 +3,7 @@ import {
   Box, Typography, Container, Paper, Grid, Chip, 
   Divider, TextField, Button, List, ListItem, 
   ListItemText, ListItemAvatar, Avatar, CircularProgress,
-  FormControl, InputLabel, Select, MenuItem
+  FormControl, InputLabel, Select, MenuItem, Card, CardContent, CardHeader
 } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -12,7 +12,7 @@ import API_URL from '../config/api';
 
 function AdminTicketDetails() {
   const { id } = useParams();
-  const { user, token } = useSelector((state) => state.auth);
+  const { token } = useSelector((state) => state.auth);
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState('');
@@ -160,7 +160,7 @@ function AdminTicketDetails() {
 
   if (loading) {
     return (
-      <Container maxWidth="md" sx={{ mt: 4, mb: 4, textAlign: 'center' }}>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, textAlign: 'center' }}>
         <CircularProgress />
         <Typography sx={{ mt: 2 }}>Loading ticket details...</Typography>
       </Container>
@@ -169,12 +169,11 @@ function AdminTicketDetails() {
 
   if (error) {
     return (
-      <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Paper sx={{ p: 3, textAlign: 'center' }}>
           <Typography color="error" gutterBottom>{error}</Typography>
           <Button 
             variant="contained" 
-            color="primary" 
             onClick={() => navigate('/admin')}
             sx={{ mt: 2 }}
           >
@@ -187,12 +186,11 @@ function AdminTicketDetails() {
 
   if (!ticket) {
     return (
-      <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Paper sx={{ p: 3, textAlign: 'center' }}>
           <Typography variant="h5" gutterBottom>Ticket not found</Typography>
           <Button 
             variant="contained" 
-            color="primary" 
             onClick={() => navigate('/admin')}
             sx={{ mt: 2 }}
           >
@@ -205,186 +203,201 @@ function AdminTicketDetails() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Paper sx={{ p: 3 }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h4" gutterBottom>
-                Ticket Details
+       {/* Header */}
+       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Box>
+            <Typography variant="h4" component="h1" gutterBottom>
+              Ticket: {ticket.title}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block">
+              ID: {ticket._id} | Created: {new Date(ticket.createdAt).toLocaleString()}
+            </Typography>
+          </Box>
+          <Button 
+            variant="outlined" 
+            onClick={() => navigate('/admin')}
+          >
+            Back to Dashboard
+          </Button>
+        </Box>
+
+      <Grid container spacing={3}>
+        {/* Left Column: Description */}
+        <Grid item xs={12} md={7}>
+          {/* Description Card */}
+          <Card sx={{ mb: 3 }}>
+            <CardHeader title="Description" />
+            <CardContent>
+              <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                {ticket.description}
               </Typography>
-              <Button 
-                variant="contained" 
-                color="primary" 
-                onClick={() => navigate('/admin')}
-              >
-                Back to Dashboard
-              </Button>
-            </Box>
-            <Typography variant="subtitle1" gutterBottom>
-              Viewing ticket ID: {ticket._id}
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12} md={8}>
-            <Typography variant="h5">{ticket.title}</Typography>
-            <Typography variant="body1" sx={{ mt: 2, whiteSpace: 'pre-wrap' }}>
-              {ticket.description}
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Paper variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="h6" gutterBottom>Ticket Info</Typography>
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="body2" component="span" color="text.secondary">Status: </Typography>
-                {getStatusChip(ticket.status)}
-              </Box>
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="body2" component="span" color="text.secondary">Priority: </Typography>
-                {getPriorityChip(ticket.priority)}
-              </Box>
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="body2" component="span" color="text.secondary">Category: </Typography>
-                <Chip label={ticket.category} />
-              </Box>
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="body2" component="span" color="text.secondary">Created: </Typography>
-                <Typography variant="body2" component="span">
-                  {new Date(ticket.createdAt).toLocaleString()}
-                </Typography>
-              </Box>
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="body2" component="span" color="text.secondary">Client: </Typography>
-                <Typography variant="body2" component="span">
-                  {ticket.client ? `${ticket.client.firstName} ${ticket.client.lastName}` : 'N/A'}
-                </Typography>
-              </Box>
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="body2" component="span" color="text.secondary">Assigned To: </Typography>
-                <Typography variant="body2" component="span">
-                  {ticket.technician ? `${ticket.technician.firstName} ${ticket.technician.lastName}` : 'Unassigned'}
-                </Typography>
-              </Box>
-            </Paper>
-
-            {/* Assign Technician Section */}
-            {(ticket.status !== 'closed' && ticket.status !== 'resolved') && (
-              <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
-                <Typography variant="h6" gutterBottom>Assign Technician</Typography>
-                <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                  <InputLabel>Select Technician</InputLabel>
-                  <Select
-                    value={selectedTechnician}
-                    onChange={(e) => setSelectedTechnician(e.target.value)}
-                    label="Select Technician"
-                  >
-                    {technicians.map((tech) => (
-                      <MenuItem key={tech._id} value={tech._id}>
-                        {tech.firstName} {tech.lastName}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Button 
-                  variant="contained" 
-                  color="primary" 
-                  fullWidth
-                  disabled={!selectedTechnician || submitting}
-                  onClick={handleAssignTechnician}
-                >
-                  {submitting ? <CircularProgress size={24} /> : 'Assign'}
-                </Button>
-              </Paper>
-            )}
-
-            {/* Resolve Ticket Section */}
-            {(ticket.status !== 'closed' && ticket.status !== 'resolved') && (
-              <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
-                <Typography variant="h6" gutterBottom>Close Ticket</Typography>
-                <TextField
-                  fullWidth
-                  label="Resolution details"
-                  multiline
-                  rows={3}
-                  value={resolution}
-                  onChange={(e) => setResolution(e.target.value)}
-                  sx={{ mb: 2 }}
-                />
-                <Button 
-                  variant="contained" 
-                  color="secondary" 
-                  fullWidth
-                  disabled={submitting}
-                  onClick={handleCloseTicket}
-                >
-                  {submitting ? <CircularProgress size={24} /> : 'Close Ticket'}
-                </Button>
-              </Paper>
-            )}
-          </Grid>
-
-          <Grid item xs={12}>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="h6" gutterBottom>Comments</Typography>
-            
-            {ticket.comments.length > 0 ? (
-              <List>
-                {ticket.comments.map((comment, index) => (
-                  <ListItem key={index} alignItems="flex-start" divider={index < ticket.comments.length - 1}>
-                    <ListItemAvatar>
-                      <Avatar>{comment.user?.firstName?.charAt(0) || 'U'}</Avatar>
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={
-                        <Typography variant="subtitle2">
-                          {comment.user?.firstName} {comment.user?.lastName} 
-                          <Typography variant="caption" component="span" sx={{ ml: 1 }}>
-                            {new Date(comment.createdAt).toLocaleString()}
-                          </Typography>
-                        </Typography>
-                      }
-                      secondary={
-                        <Typography
-                          variant="body2"
-                          color="text.primary"
-                          sx={{ mt: 1, whiteSpace: 'pre-wrap' }}
-                        >
-                          {comment.content}
-                        </Typography>
-                      }
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            ) : (
-              <Typography variant="body2" color="text.secondary">No comments yet.</Typography>
-            )}
-
-            {/* Add Comment Form */}
-            {(ticket.status !== 'closed') && (
-              <Box component="form" onSubmit={handleCommentSubmit} sx={{ mt: 3 }}>
-                <TextField
-                  fullWidth
-                  label="Add a comment"
-                  multiline
-                  rows={3}
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  sx={{ mb: 2 }}
-                />
-                <Button 
-                  type="submit" 
-                  variant="contained" 
-                  color="primary"
-                  disabled={!comment.trim() || submitting}
-                >
-                  {submitting ? <CircularProgress size={24} /> : 'Add Comment'}
-                </Button>
-              </Box>
-            )}
-          </Grid>
+            </CardContent>
+          </Card>
         </Grid>
-      </Paper>
+
+        {/* Right Column: Info, Actions & Comments */}
+        <Grid item xs={12} md={5}>
+          {/* Ticket Info Card */}
+          <Card sx={{ mb: 3 }}>
+             <CardHeader title="Ticket Information" />
+             <CardContent>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Status:</Typography></Grid>
+                  <Grid item xs={7}>{getStatusChip(ticket.status)}</Grid>
+                  
+                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Priority:</Typography></Grid>
+                  <Grid item xs={7}>{getPriorityChip(ticket.priority)}</Grid>
+                  
+                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Category:</Typography></Grid>
+                  <Grid item xs={7}><Chip label={ticket.category} size="small" /></Grid>
+
+                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Client:</Typography></Grid>
+                  <Grid item xs={7}><Typography variant="body2">{ticket.client?.firstName} {ticket.client?.lastName} ({ticket.client?.email})</Typography></Grid>
+                  
+                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Assigned To:</Typography></Grid>
+                  <Grid item xs={7}><Typography variant="body2">{ticket.technician ? `${ticket.technician.firstName} ${ticket.technician.lastName}` : 'Unassigned'}</Typography></Grid>
+                </Grid>
+             </CardContent>
+          </Card>
+
+          {/* Actions Card */}
+          <Card sx={{ mb: 3 }}>
+            <CardHeader title="Actions" />
+            <CardContent>
+              {/* Assign Technician */}
+              {ticket.status !== 'closed' && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom>Assign Technician</Typography>
+                  <FormControl fullWidth variant="outlined" size="small">
+                    <InputLabel>Select Technician</InputLabel>
+                    <Select
+                      value={selectedTechnician}
+                      onChange={(e) => setSelectedTechnician(e.target.value)}
+                      label="Select Technician"
+                    >
+                      <MenuItem value=""><em>Unassigned</em></MenuItem>
+                      {technicians.map((tech) => (
+                        <MenuItem key={tech._id} value={tech._id}>
+                          {tech.firstName} {tech.lastName}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <Button 
+                    variant="contained" 
+                    onClick={handleAssignTechnician}
+                    disabled={submitting || !selectedTechnician || selectedTechnician === ticket.technician?._id}
+                    sx={{ mt: 1 }}
+                    size="small"
+                  >
+                    {submitting ? <CircularProgress size={20} /> : 'Assign'}
+                  </Button>
+                </Box>
+              )}
+
+              {/* Close Ticket */}
+              {ticket.status !== 'closed' && (
+                <Box>
+                  <Typography variant="subtitle1" gutterBottom>Close Ticket</Typography>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={3}
+                    label="Resolution Description (optional)"
+                    value={resolution}
+                    onChange={(e) => setResolution(e.target.value)}
+                    variant="outlined"
+                    size="small"
+                    sx={{ mb: 1 }}
+                  />
+                  <Button 
+                    variant="contained" 
+                    color="success" 
+                    onClick={handleCloseTicket}
+                    disabled={submitting}
+                    size="small"
+                  >
+                    {submitting ? <CircularProgress size={20} /> : 'Close Ticket'}
+                  </Button>
+                </Box>
+              )}
+              {ticket.status === 'closed' && (
+                <Box>
+                    <Typography variant="subtitle1" gutterBottom>Resolution</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                    This ticket is closed.
+                    {ticket.resolutionDescription 
+                        ? <><br/>Resolution: {ticket.resolutionDescription}</> 
+                        : " (No resolution description provided)"}
+                    </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Comments Card - MOVED HERE */}
+          <Card>
+            <CardHeader title="Comments" />
+            <CardContent>
+              <List sx={{ maxHeight: 350, overflow: 'auto', mb: 2, p: 0 }}>
+                {ticket.comments && ticket.comments.length > 0 ? (
+                  ticket.comments.map((comment) => (
+                    <React.Fragment key={comment._id}>
+                      <ListItem alignItems="flex-start">
+                        <ListItemAvatar>
+                          <Avatar>{comment.author?.firstName?.[0] || 'U'}</Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={comment.content}
+                          secondary={
+                            <>
+                              <Typography component="span" variant="body2" color="text.primary">
+                                {comment.author?.firstName} {comment.author?.lastName} 
+                                {comment.author?.isAdmin && <Chip label="Admin" size="small" sx={{ ml: 1 }} />}
+                              </Typography>
+                              {" — " + new Date(comment.createdAt).toLocaleString()}
+                            </>
+                          }
+                        />
+                      </ListItem>
+                      <Divider variant="inset" component="li" />
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <ListItem>
+                    <ListItemText primary="No comments yet." />
+                  </ListItem>
+                )}
+              </List>
+
+              {/* Add Comment Form */}
+              {ticket.status !== 'closed' && (
+                  <Box component="form" onSubmit={handleCommentSubmit} sx={{ mt: 2 }}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={3}
+                      label="Add a comment"
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      variant="outlined"
+                      size="small"
+                    />
+                    <Button 
+                      type="submit" 
+                      variant="contained" 
+                      disabled={submitting || !comment.trim()}
+                      sx={{ mt: 1 }}
+                      size="small"
+                    >
+                      {submitting ? <CircularProgress size={20} /> : 'Add Comment'}
+                    </Button>
+                  </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
     </Container>
   );
 }
