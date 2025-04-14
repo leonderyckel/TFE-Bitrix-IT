@@ -1,7 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+import API_URL from '../../config/api';
 
 // Async thunks
 export const fetchTickets = createAsyncThunk(
@@ -72,6 +71,30 @@ export const addComment = createAsyncThunk(
       const response = await axios.post(`${API_URL}/tickets/${ticketId}/comments`, { content: comment }, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
+export const updateTicketProgress = createAsyncThunk(
+  'tickets/updateTicketProgress',
+  async ({ ticketId, progressData }, { rejectWithValue, getState }) => {
+    try {
+      const { auth } = getState();
+      const token = auth.token;
+      
+      const response = await axios.post(
+        `${API_URL}/admin/tickets/${ticketId}/progress`,
+        progressData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data);
@@ -198,6 +221,32 @@ const ticketSlice = createSlice({
       .addCase(addComment.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload?.message || 'Failed to add comment';
+      })
+      // Handle updateTicketProgress
+      .addCase(updateTicketProgress.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateTicketProgress.fulfilled, (state, action) => {
+        state.loading = false;
+        state.error = null;
+        
+        // Update the ticket with new progress information
+        const updatedTicket = action.payload;
+        const index = state.tickets.findIndex(ticket => ticket._id === updatedTicket._id);
+        
+        if (index !== -1) {
+          state.tickets[index] = updatedTicket;
+        }
+        
+        // If this is the currently viewed ticket, update it too
+        if (state.currentTicket && state.currentTicket._id === updatedTicket._id) {
+          state.currentTicket = updatedTicket;
+        }
+      })
+      .addCase(updateTicketProgress.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || 'Failed to update ticket progress';
       });
   }
 });

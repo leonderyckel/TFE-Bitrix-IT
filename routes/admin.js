@@ -175,6 +175,60 @@ router.post('/tickets/:id/comments', async (req, res) => {
   }
 });
 
+// Ajouter une mise à jour de progression à un ticket
+router.post('/tickets/:id/progress', async (req, res) => {
+  try {
+    const { Ticket } = getModels();
+    const ticket = await Ticket.findById(req.params.id);
+    
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+    
+    // Validate the status
+    const validStatuses = ['logged', 'assigned', 'quote-sent', 'hardware-ordered', 'scheduled', 'rescheduled', 'closed'];
+    if (!validStatuses.includes(req.body.status)) {
+      return res.status(400).json({ message: 'Invalid status', valid: validStatuses });
+    }
+    
+    // Vérifier que la description est présente
+    if (!req.body.description) {
+      return res.status(400).json({ message: 'Description is required' });
+    }
+    
+    // Add progress update
+    ticket.progress.push({
+      status: req.body.status,
+      description: req.body.description,
+      date: new Date(),
+      updatedBy: req.admin._id
+    });
+    
+    // Update ticket status if needed
+    if (req.body.status === 'closed') {
+      ticket.status = 'closed';
+    } else if (req.body.status === 'assigned') {
+      ticket.status = 'in-progress';
+    }
+    
+    await ticket.save();
+    
+    // Add automatic comment for this progress update
+    ticket.comments.push({
+      user: req.admin._id,
+      content: `Status updated to ${req.body.status}: ${req.body.description}`
+    });
+    
+    await ticket.save();
+    
+    // Return the updated ticket
+    res.json(ticket);
+  } catch (error) {
+    console.error('Error adding progress update:', error);
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
+});
+
 // Assigner un technicien à un ticket
 router.post('/tickets/:id/assign', async (req, res) => {
   try {

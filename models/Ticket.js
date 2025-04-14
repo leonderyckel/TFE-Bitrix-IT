@@ -12,7 +12,7 @@ const ticketSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['open', 'in-progress', 'resolved', 'closed'],
+    enum: ['open', 'assigned', 'in-progress', 'waiting-client', 'diagnosing', 'resolved', 'closed'],
     default: 'open'
   },
   priority: {
@@ -34,6 +34,25 @@ const ticketSchema = new mongoose.Schema({
     required: true,
     enum: ['hardware', 'software', 'network', 'security', 'other']
   },
+  progress: [{
+    date: {
+      type: Date,
+      default: Date.now
+    },
+    status: {
+      type: String,
+      enum: ['logged', 'assigned', 'quote-sent', 'hardware-ordered', 'scheduled', 'rescheduled', 'closed'],
+      required: true
+    },
+    description: {
+      type: String,
+      required: true
+    },
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  }],
   attachments: [{
     filename: String,
     path: String,

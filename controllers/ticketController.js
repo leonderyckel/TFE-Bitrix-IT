@@ -4,10 +4,20 @@ const { getModels } = require('../models');
 exports.createTicket = async (req, res) => {
   try {
     const { Ticket } = getModels();
-    const ticket = await Ticket.create({
+    
+    // Add initial progress tracking entry
+    const ticketData = {
       ...req.body,
-      client: req.user.id
-    });
+      client: req.user.id,
+      progress: [{
+        status: 'logged',
+        description: 'Ticket submitted',
+        date: new Date(),
+        updatedBy: req.user.id
+      }]
+    };
+    
+    const ticket = await Ticket.create(ticketData);
 
     res.status(201).json(ticket);
   } catch (error) {
@@ -141,6 +151,23 @@ exports.assignTechnician = async (req, res) => {
 
     ticket.technician = technician._id;
     ticket.status = 'in-progress';
+    
+    // Add progress entry for technician assignment
+    ticket.progress.push({
+      status: 'assigned',
+      description: `Ticket assigned to technician ${technician.firstName} ${technician.lastName}`,
+      date: new Date(),
+      updatedBy: req.user.id
+    });
+    
+    // Add a second progress entry for status change to in-progress
+    ticket.progress.push({
+      status: 'in-progress',
+      description: 'Ticket is now in progress',
+      date: new Date(),
+      updatedBy: req.user.id
+    });
+    
     await ticket.save();
 
     res.json(ticket);

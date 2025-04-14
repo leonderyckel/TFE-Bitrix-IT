@@ -3,12 +3,19 @@ import {
   Box, Typography, Container, Paper, Grid, Chip, 
   Divider, TextField, Button, List, ListItem, 
   ListItemText, ListItemAvatar, Avatar, CircularProgress,
-  FormControl, InputLabel, Select, MenuItem, Card, CardContent, CardHeader
+  FormControl, InputLabel, Select, MenuItem, Card, CardContent, CardHeader,
+  Stepper, Step, StepLabel, FormHelperText
 } from '@mui/material';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import API_URL from '../config/api';
+import { 
+  fetchTicket, 
+  updateTicket, 
+  addComment, 
+  updateTicketProgress
+} from '../store/slices/ticketSlice';
 
 function AdminTicketDetails() {
   const { id } = useParams();
@@ -21,7 +28,53 @@ function AdminTicketDetails() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [resolution, setResolution] = useState('');
+  const [progressStatus, setProgressStatus] = useState('');
+  const [progressNote, setProgressNote] = useState('');
+  const [formData, setFormData] = useState(null);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  // Définir toutes les étapes possibles de progression
+  const allProgressSteps = [
+    { value: 'logged', label: 'Logged', required: true },
+    { value: 'assigned', label: 'Assigned', optional: true },
+    { value: 'quote-sent', label: 'Quote Sent', optional: true },
+    { value: 'hardware-ordered', label: 'Hardware Ordered', optional: true },
+    { value: 'scheduled', label: 'Scheduled', optional: true },
+    { value: 'rescheduled', label: 'Rescheduled', optional: true },
+    { value: 'closed', label: 'Closed', optional: true }
+  ];
+
+  // Fonction pour mettre à jour le statut de progression
+  const handleUpdateProgress = async (progressStatus, description) => {
+    try {
+      setSubmitting(true);
+      const response = await axios.post(
+        `${API_URL}/admin/tickets/${id}/progress`,
+        { 
+          status: progressStatus, 
+          description: description || `Status updated to ${progressStatus}`
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      setTicket(response.data);
+    } catch (error) {
+      console.error('Error adding progress update:', error);
+      setError('Failed to add progress update. ' + (error.response?.data?.message || error.message));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Vérifier si une étape a déjà été marquée comme complétée
+  const isStepCompleted = (stepValue) => {
+    if (!ticket || !ticket.progress || !ticket.progress.length) return false;
+    return ticket.progress.some(p => p.status === stepValue);
+  };
 
   useEffect(() => {
     const fetchTicket = async () => {
@@ -393,6 +446,100 @@ function AdminTicketDetails() {
                       {submitting ? <CircularProgress size={20} /> : 'Add Comment'}
                     </Button>
                   </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Progress Tracking Card */}
+        <Grid item xs={12}>
+          <Card sx={{ mb: 3 }}>
+            <CardHeader title="Progress Tracking" />
+            <CardContent>
+              <Typography variant="subtitle1" gutterBottom>
+                Check completed steps to make them visible to client
+              </Typography>
+              <Paper elevation={0} sx={{ p: 2, bgcolor: 'background.paper' }}>
+                <Grid container spacing={2}>
+                  {allProgressSteps.map((step) => (
+                    <Grid item xs={12} sm={6} md={4} key={step.value}>
+                      <Box 
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          p: 1,
+                          borderRadius: 1,
+                          border: '1px solid',
+                          borderColor: isStepCompleted(step.value) ? 'primary.main' : 'divider'
+                        }}
+                      >
+                        <Chip 
+                          label={step.label} 
+                          color={isStepCompleted(step.value) ? "primary" : "default"}
+                          variant={isStepCompleted(step.value) ? "filled" : "outlined"}
+                          size="small"
+                          sx={{ mr: 1 }}
+                        />
+                        {isStepCompleted(step.value) ? (
+                          <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                            Completed
+                          </Typography>
+                        ) : (
+                          <Button 
+                            size="small" 
+                            variant="outlined"
+                            onClick={() => {
+                              const description = window.prompt(`Add description for ${step.label} step:`);
+                              if (description) {
+                                handleUpdateProgress(step.value, description);
+                              }
+                            }}
+                            disabled={submitting}
+                          >
+                            Mark as Done
+                          </Button>
+                        )}
+                      </Box>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Paper>
+              
+              {/* Progress History */}
+              {ticket && ticket.progress && ticket.progress.length > 0 && (
+                <Box mt={3}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Progress History
+                  </Typography>
+                  <List>
+                    {ticket.progress.map((progress, index) => (
+                      <ListItem key={index} divider={index < ticket.progress.length - 1}>
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: 'primary.main' }}>
+                            {index + 1}
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={
+                            <Typography variant="subtitle2">
+                              {allProgressSteps.find(s => s.value === progress.status)?.label || progress.status}
+                            </Typography>
+                          }
+                          secondary={
+                            <>
+                              <Typography variant="body2" component="span">
+                                {progress.description}
+                              </Typography>
+                              <Typography variant="caption" display="block" color="text.secondary">
+                                {new Date(progress.date).toLocaleString()}
+                              </Typography>
+                            </>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
               )}
             </CardContent>
           </Card>

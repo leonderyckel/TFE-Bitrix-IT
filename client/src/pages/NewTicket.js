@@ -1,164 +1,185 @@
-import React, { useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Container,
-  Box,
+  Paper,
   Typography,
   TextField,
   Button,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Grid,
+  Box,
   Alert,
-  Paper,
-  MenuItem
+  CircularProgress,
+  FormHelperText
 } from '@mui/material';
-import { useFormik } from 'formik';
-import * as yup from 'yup';
 import { createTicket } from '../store/slices/ticketSlice';
 
-const validationSchema = yup.object({
-  title: yup
-    .string()
-    .required('Title is required')
-    .min(5, 'Title should be at least 5 characters'),
-  description: yup
-    .string()
-    .required('Description is required')
-    .min(20, 'Description should be at least 20 characters'),
-  category: yup
-    .string()
-    .required('Category is required'),
-  priority: yup
-    .string()
-    .required('Priority is required')
-});
-
 const NewTicket = () => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading, error } = useSelector((state) => state.tickets);
-  const { isAuthenticated, user } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+  const { loading } = useSelector((state) => state.tickets);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, navigate]);
-
-  const formik = useFormik({
-    initialValues: {
-      title: '',
-      description: '',
-      category: 'software',
-      priority: 'medium'
-    },
-    validationSchema: validationSchema,
-    onSubmit: async (values) => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('No authentication token found');
-        }
-        await dispatch(createTicket(values)).unwrap();
-        navigate('/tickets');
-      } catch (err) {
-        console.error('Failed to create ticket:', err);
-      }
-    }
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    priority: 'medium',
+    category: 'software'
   });
 
-  if (!isAuthenticated) {
-    return null;
-  }
+  const [errors, setErrors] = useState({});
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    // Clear error when field is updated
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: '',
+      }));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.title.trim()) {
+      newErrors.title = 'Title is required';
+    }
+    if (!formData.description.trim()) {
+      newErrors.description = 'Description is required';
+    }
+    if (!formData.category) {
+      newErrors.category = 'Category is required';
+    }
+    if (!formData.priority) {
+      newErrors.priority = 'Priority is required';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    try {
+      await dispatch(createTicket(formData)).unwrap();
+      navigate('/tickets');
+    } catch (error) {
+      setErrors((prev) => ({
+        ...prev,
+        submit: error.message || 'Failed to create ticket. Please try again.',
+      }));
+    }
+  };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Paper sx={{ p: 4 }}>
-        <Typography variant="h4" gutterBottom>
+    <Container maxWidth="md" sx={{ mt: 4 }}>
+      <Paper elevation={3} sx={{ p: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
           Create New Ticket
         </Typography>
-        {error && (
+        
+        {errors.submit && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
+            {errors.submit}
           </Alert>
         )}
-        <Box component="form" onSubmit={formik.handleSubmit}>
-          <TextField
-            fullWidth
-            id="title"
-            name="title"
-            label="Ticket Title"
-            value={formik.values.title}
-            onChange={formik.handleChange}
-            error={formik.touched.title && Boolean(formik.errors.title)}
-            helperText={formik.touched.title && formik.errors.title}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            id="description"
-            name="description"
-            label="Description"
-            multiline
-            rows={4}
-            value={formik.values.description}
-            onChange={formik.handleChange}
-            error={formik.touched.description && Boolean(formik.errors.description)}
-            helperText={formik.touched.description && formik.errors.description}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            id="category"
-            name="category"
-            select
-            label="Category"
-            value={formik.values.category}
-            onChange={formik.handleChange}
-            error={formik.touched.category && Boolean(formik.errors.category)}
-            helperText={formik.touched.category && formik.errors.category}
-            margin="normal"
-          >
-            <MenuItem value="hardware">Hardware</MenuItem>
-            <MenuItem value="software">Software</MenuItem>
-            <MenuItem value="network">Network</MenuItem>
-            <MenuItem value="security">Security</MenuItem>
-            <MenuItem value="other">Other</MenuItem>
-          </TextField>
-          <TextField
-            fullWidth
-            id="priority"
-            name="priority"
-            select
-            label="Priority"
-            value={formik.values.priority}
-            onChange={formik.handleChange}
-            error={formik.touched.priority && Boolean(formik.errors.priority)}
-            helperText={formik.touched.priority && formik.errors.priority}
-            margin="normal"
-          >
-            <MenuItem value="low">Low</MenuItem>
-            <MenuItem value="medium">Medium</MenuItem>
-            <MenuItem value="high">High</MenuItem>
-            <MenuItem value="critical">Critical</MenuItem>
-          </TextField>
-          <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              disabled={loading}
-              sx={{ flex: 1 }}
-            >
-              {loading ? 'Creating...' : 'Create Ticket'}
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={() => navigate('/tickets')}
-              sx={{ flex: 1 }}
-            >
-              Cancel
-            </Button>
-          </Box>
+        
+        <Box component="form" onSubmit={handleSubmit} noValidate>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <TextField
+                required
+                fullWidth
+                label="Ticket Title"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                error={!!errors.title}
+                helperText={errors.title}
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required error={!!errors.category}>
+                <InputLabel>Category</InputLabel>
+                <Select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleChange}
+                >
+                  <MenuItem value="hardware">Hardware</MenuItem>
+                  <MenuItem value="software">Software</MenuItem>
+                  <MenuItem value="network">Network</MenuItem>
+                  <MenuItem value="security">Security</MenuItem>
+                  <MenuItem value="other">Other</MenuItem>
+                </Select>
+                {errors.category && <FormHelperText>{errors.category}</FormHelperText>}
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required error={!!errors.priority}>
+                <InputLabel>Priority</InputLabel>
+                <Select
+                  name="priority"
+                  value={formData.priority}
+                  onChange={handleChange}
+                >
+                  <MenuItem value="low">Low</MenuItem>
+                  <MenuItem value="medium">Medium</MenuItem>
+                  <MenuItem value="high">High</MenuItem>
+                  <MenuItem value="critical">Critical</MenuItem>
+                </Select>
+                {errors.priority && <FormHelperText>{errors.priority}</FormHelperText>}
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <TextField
+                required
+                fullWidth
+                multiline
+                rows={6}
+                label="Description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                error={!!errors.description}
+                helperText={errors.description || "Please provide detailed information about your issue"}
+              />
+            </Grid>
+            
+            <Grid item xs={12} sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/tickets')}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={loading}
+                startIcon={loading ? <CircularProgress size={20} /> : null}
+              >
+                Submit Ticket
+              </Button>
+            </Grid>
+          </Grid>
         </Box>
       </Paper>
     </Container>
