@@ -15,8 +15,12 @@ import {
   Chip,
   Stepper,
   Step,
-  StepLabel
+  StepLabel,
+  Card,
+  CardContent,
+  useTheme
 } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 import UpdateIcon from '@mui/icons-material/Update';
 import { fetchTickets } from '../store/slices/ticketSlice';
 
@@ -26,6 +30,7 @@ const TicketList = () => {
   const { tickets, loading } = useSelector((state) => state.tickets);
   // eslint-disable-next-line no-unused-vars
   const { user } = useSelector((state) => state.auth);
+  const theme = useTheme();
 
   useEffect(() => {
     dispatch(fetchTickets());
@@ -108,142 +113,184 @@ const TicketList = () => {
   };
 
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom>
-        Vos tickets
-      </Typography>
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>ID</TableCell>
-              <TableCell>Titre</TableCell>
-              <TableCell>Statut</TableCell>
-              <TableCell>Priorité</TableCell>
-              <TableCell>Catégorie</TableCell>
-              <TableCell>Date de création</TableCell>
-              <TableCell>Progression</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={8} align="center">
-                  Chargement...
-                </TableCell>
-              </TableRow>
-            ) : tickets && tickets.length > 0 ? (
-              tickets.map((ticket) => (
-                <TableRow key={ticket._id}>
-                  <TableCell>{ticket._id.substring(0, 8)}</TableCell>
-                  <TableCell>{ticket.title}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={ticket.status}
-                      color={getStatusColor(ticket.status)}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={ticket.priority}
-                      color={getPriorityColor(ticket.priority)}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>{ticket.category}</TableCell>
-                  <TableCell>
-                    {new Date(ticket.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ width: '100%', maxWidth: 250 }}>
-                      <Stepper 
-                        activeStep={getActiveStepIndex(ticket)} 
-                        alternativeLabel 
-                        size="small"
-                        sx={{
-                          '& .MuiStepConnector-root': {
-                            '& .MuiStepConnector-line': {
-                              borderColor: 'warning.main',
-                              borderTopWidth: '2px'
-                            }
-                          }
-                        }}
-                      >
-                        {getCompletedSteps(ticket).map((label, index) => {
-                          const isInProgress = label === 'In Progress';
-                          const isClosed = label === 'Closed';
-                          
-                          let textColor = {};
-                          if (isInProgress) {
-                            textColor = { color: 'warning.main', fontWeight: 'bold' };
-                          } else if (isClosed) {
-                            textColor = { color: 'success.main', fontWeight: 'bold' };
-                          }
-                          
-                          return (
-                            <Step 
-                              key={index} 
-                              completed={index < getActiveStepIndex(ticket)}
-                              sx={{
-                                '& .MuiStepIcon-root': {
-                                  color: isClosed ? 'success.main' : (isInProgress ? 'warning.main' : 'primary.main'),
-                                  '&.Mui-completed': {
-                                    color: 'primary.main'
-                                  },
-                                  '&.Mui-active': {
-                                    color: isClosed ? 'success.main' : 'warning.main'
-                                  },
-                                  '& text': {
-                                    fill: 'transparent' // Hide the numbers inside the circle
-                                  }
-                                }
-                              }}
-                            >
-                              <StepLabel 
-                                sx={{
-                                  '& .MuiStepLabel-label': textColor
-                                }}
-                              >
-                                {label}
-                              </StepLabel>
-                            </Step>
-                          );
-                        })}
-                      </Stepper>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      startIcon={<UpdateIcon />}
-                      size="small"
-                      onClick={() => navigate(`/tickets/${ticket._id}`)}
-                    >
-                      Détails
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={8} align="center">
-                  Aucun ticket trouvé
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-      <Box mt={2}>
+    <Box sx={{ position: 'relative', pb: 4 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        mb: 3,
+        backgroundColor: theme.palette.primary.main,
+        borderRadius: '8px',
+        color: 'white',
+        p: 2
+      }}>
+        <Typography variant="h5" sx={{ fontWeight: 'bold', pl: 1 }}>
+          Your Tickets
+        </Typography>
         <Button
           variant="contained"
-          color="primary"
+          color="secondary"
+          startIcon={<AddIcon />}
           onClick={() => navigate('/tickets/new')}
+          sx={{ 
+            boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+            fontWeight: 'bold',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: '0 6px 12px rgba(0,0,0,0.15)',
+            },
+            transition: 'all 0.2s ease'
+          }}
         >
           New Ticket
         </Button>
       </Box>
+      
+      <Card elevation={3}>
+        <CardContent sx={{ p: 0 }}>
+          <TableContainer>
+            <Table>
+              <TableHead sx={{ backgroundColor: theme.palette.grey[100] }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>ID</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Priority</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Category</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Creation Date</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Progress</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center">
+                      Loading...
+                    </TableCell>
+                  </TableRow>
+                ) : tickets && tickets.length > 0 ? (
+                  tickets.map((ticket) => (
+                    <TableRow 
+                      key={ticket._id} 
+                      sx={{ 
+                        '&:hover': { 
+                          backgroundColor: theme.palette.action.hover 
+                        } 
+                      }}
+                    >
+                      <TableCell>{ticket._id.substring(0, 8)}</TableCell>
+                      <TableCell sx={{ fontWeight: 'medium' }}>{ticket.title}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={ticket.status}
+                          color={getStatusColor(ticket.status)}
+                          size="small"
+                          sx={{ fontWeight: 'bold' }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={ticket.priority}
+                          color={getPriorityColor(ticket.priority)}
+                          size="small"
+                          sx={{ fontWeight: 'bold' }}
+                        />
+                      </TableCell>
+                      <TableCell>{ticket.category}</TableCell>
+                      <TableCell>
+                        {new Date(ticket.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ width: '100%', maxWidth: 250 }}>
+                          <Stepper 
+                            activeStep={getActiveStepIndex(ticket)} 
+                            alternativeLabel 
+                            size="small"
+                            sx={{
+                              '& .MuiStepConnector-root': {
+                                '& .MuiStepConnector-line': {
+                                  borderColor: 'warning.main',
+                                  borderTopWidth: '2px'
+                                }
+                              }
+                            }}
+                          >
+                            {getCompletedSteps(ticket).map((label, index) => {
+                              const isInProgress = label === 'In Progress';
+                              const isClosed = label === 'Closed';
+                              
+                              let textColor = {};
+                              if (isInProgress) {
+                                textColor = { color: 'warning.main', fontWeight: 'bold' };
+                              } else if (isClosed) {
+                                textColor = { color: 'success.main', fontWeight: 'bold' };
+                              }
+                              
+                              return (
+                                <Step 
+                                  key={index} 
+                                  completed={index < getActiveStepIndex(ticket)}
+                                  sx={{
+                                    '& .MuiStepIcon-root': {
+                                      color: isClosed ? 'success.main' : (isInProgress ? 'warning.main' : 'primary.main'),
+                                      '&.Mui-completed': {
+                                        color: 'primary.main'
+                                      },
+                                      '&.Mui-active': {
+                                        color: isClosed ? 'success.main' : 'warning.main'
+                                      },
+                                      '& text': {
+                                        fill: 'transparent' // Hide the numbers inside the circle
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <StepLabel 
+                                    sx={{
+                                      '& .MuiStepLabel-label': textColor
+                                    }}
+                                  >
+                                    {label}
+                                  </StepLabel>
+                                </Step>
+                              );
+                            })}
+                          </Stepper>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          startIcon={<UpdateIcon />}
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                          onClick={() => navigate(`/tickets/${ticket._id}`)}
+                          sx={{
+                            borderRadius: '20px',
+                            '&:hover': {
+                              backgroundColor: theme.palette.primary.light,
+                              color: 'white'
+                            }
+                          }}
+                        >
+                          Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center">
+                      No tickets found
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
     </Box>
   );
 };
