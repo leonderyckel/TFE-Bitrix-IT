@@ -14,6 +14,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PendingIcon from '@mui/icons-material/Pending';
 import WarningIcon from '@mui/icons-material/Warning';
 import PriorityHighIcon from '@mui/icons-material/PriorityHigh';
+import CancelIcon from '@mui/icons-material/Cancel';
 
 function AdminDashboard() {
   const { user, token } = useSelector((state) => state.auth);
@@ -70,7 +71,9 @@ function AdminDashboard() {
       case 'resolved':
         return <Chip label="Resolved" color="success" icon={<CheckCircleIcon />} />;
       case 'closed':
-        return <Chip label="Closed" color="default" />;
+        return <Chip label="Done" color="default" />;
+      case 'cancelled':
+        return <Chip label="Cancelled" color="secondary" icon={<CancelIcon />} />;
       default:
         return <Chip label={status} />;
     }
@@ -96,6 +99,7 @@ function AdminDashboard() {
     if (tabValue === 1) return ticket.status === 'open'; // Open tickets
     if (tabValue === 2) return ticket.status === 'in-progress'; // In progress tickets
     if (tabValue === 3) return ['resolved', 'closed'].includes(ticket.status); // Resolved tickets
+    if (tabValue === 4) return ticket.status === 'cancelled'; // Cancelled tickets
     return true;
   });
 
@@ -121,11 +125,12 @@ function AdminDashboard() {
             </Typography>
 
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-              <Tabs value={tabValue} onChange={handleChangeTab}>
+              <Tabs value={tabValue} onChange={handleChangeTab} variant="scrollable" scrollButtons="auto">
                 <Tab label="All Tickets" />
                 <Tab label="Open" />
                 <Tab label="In Progress" />
-                <Tab label="Resolved/Closed" />
+                <Tab label="Resolved/Done" />
+                <Tab label="Cancelled" />
               </Tabs>
             </Box>
 

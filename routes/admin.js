@@ -256,6 +256,46 @@ router.post('/tickets/:id/assign', async (req, res) => {
   }
 });
 
+// Annuler un ticket
+router.post('/tickets/:id/cancel', async (req, res) => {
+  try {
+    const { Ticket } = getModels();
+    const { reason } = req.body; // Get reason from request body
+
+    // Check if reason is provided
+    if (!reason || typeof reason !== 'string' || reason.trim() === '') {
+      return res.status(400).json({ message: 'Cancellation reason is required.' });
+    }
+
+    const ticket = await Ticket.findById(req.params.id);
+
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    // Check if ticket is already cancelled or closed
+    if (['closed', 'cancelled'].includes(ticket.status)) {
+      return res.status(400).json({ message: `Ticket is already ${ticket.status}` });
+    }
+
+    ticket.status = 'cancelled';
+    // Optionally add a dedicated field later: ticket.cancellationReason = reason.trim();
+    await ticket.save();
+
+    // Add automatic comment for cancellation including the reason
+    ticket.comments.push({
+      user: req.admin._id,
+      content: `Ticket cancelled by admin. Reason: ${reason.trim()}`
+    });
+    await ticket.save();
+
+    res.json(ticket);
+  } catch (error) {
+    console.error('Error cancelling ticket:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Clôturer un ticket
 router.post('/tickets/:id/close', async (req, res) => {
   try {

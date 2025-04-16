@@ -210,8 +210,14 @@ const TicketList = () => {
                             sx={{
                               '& .MuiStepConnector-root': {
                                 '& .MuiStepConnector-line': {
-                                  borderColor: 'warning.main',
+                                  borderColor: 'primary.main',
                                   borderTopWidth: '2px'
+                                },
+                                '&.Mui-active .MuiStepConnector-line': {
+                                  borderColor: 'primary.main'
+                                },
+                                '&.Mui-completed .MuiStepConnector-line': {
+                                  borderColor: 'primary.main'
                                 }
                               }
                             }}
