@@ -4,7 +4,8 @@ import {
   Divider, TextField, Button, List, ListItem, 
   ListItemText, ListItemAvatar, Avatar, CircularProgress,
   FormControl, InputLabel, Select, MenuItem, Card, CardContent, CardHeader,
-  Stepper, Step, StepLabel, FormHelperText
+  Stepper, Step, StepLabel, FormHelperText,
+  Stack
 } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -136,29 +137,6 @@ function AdminTicketDetails() {
     } catch (error) {
       console.error('Error adding comment:', error);
       setError('Failed to add comment. ' + (error.response?.data?.message || error.message));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleAssignTechnician = async () => {
-    if (!selectedTechnician) return;
-
-    try {
-      setSubmitting(true);
-      const response = await axios.post(
-        `${API_URL}/admin/tickets/${id}/assign`,
-        { technicianId: selectedTechnician },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-      setTicket(response.data);
-    } catch (error) {
-      console.error('Error assigning technician:', error);
-      setError('Failed to assign technician. ' + (error.response?.data?.message || error.message));
     } finally {
       setSubmitting(false);
     }
@@ -306,8 +284,9 @@ function AdminTicketDetails() {
         </Box>
 
       <Grid container spacing={3}>
-        {/* Left Column: Description & Progress */}
-        <Grid item xs={12} md={7}>
+        {/* Combined Sections in a single full-width column */}
+        <Grid item xs={12} md={12}>
+          
           {/* Description Card */}
           <Card sx={{ mb: 3 }}>
             <CardHeader title="Description" />
@@ -318,6 +297,29 @@ function AdminTicketDetails() {
             </CardContent>
           </Card>
 
+          {/* Ticket Info Card */}
+          <Card sx={{ mb: 3 }}>
+             <CardHeader title="Ticket Information" />
+             <CardContent>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Status:</Typography></Grid>
+                  <Grid item xs={7}>{getStatusChip(ticket.status)}</Grid>
+                  
+                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Priority:</Typography></Grid>
+                  <Grid item xs={7}>{getPriorityChip(ticket.priority)}</Grid>
+                  
+                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Category:</Typography></Grid>
+                  <Grid item xs={7}><Chip label={ticket.category} size="small" /></Grid>
+
+                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Client:</Typography></Grid>
+                  <Grid item xs={7}><Typography variant="body2">{ticket.client?.firstName} {ticket.client?.lastName} ({ticket.client?.email})</Typography></Grid>
+                  
+                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Assigned To:</Typography></Grid>
+                  <Grid item xs={7}><Typography variant="body2">{ticket.technician ? `${ticket.technician.firstName} ${ticket.technician.lastName}` : 'Unassigned'}</Typography></Grid>
+                </Grid>
+             </CardContent>
+          </Card>
+
           {/* Progress Tracking Card */}
           <Card sx={{ mb: 3 }}>
             <CardHeader title="Progress Tracking" />
@@ -325,53 +327,47 @@ function AdminTicketDetails() {
               <Typography variant="subtitle1" gutterBottom>
                 Check completed steps to make them visible to client
               </Typography>
-              <Paper elevation={0} sx={{ p: 2, bgcolor: 'background.paper' }}>
-                <Grid container spacing={2}>
-                  {allProgressSteps.map((step) => (
-                    <Grid item xs={12} sm={6} md={4} key={step.value}>
-                      <Box 
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          p: 1,
-                          borderRadius: 1,
-                          border: '1px solid',
-                          borderColor: isStepCompleted(step.value) ? 'primary.main' : 'divider'
+              <Stack spacing={2} divider={<Divider flexItem />}>
+                {allProgressSteps.map((step) => (
+                  <Box 
+                    key={step.value}
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      py: 1
+                    }}
+                  >
+                    <Chip 
+                      label={step.label} 
+                      color={isStepCompleted(step.value) ? "primary" : "default"}
+                      variant={isStepCompleted(step.value) ? "filled" : "outlined"}
+                      size="small"
+                    />
+                    {isStepCompleted(step.value) ? (
+                      <Typography variant="body2" color="text.secondary">
+                        Completed
+                      </Typography>
+                    ) : (
+                      <Button 
+                        size="small" 
+                        variant="outlined"
+                        onClick={() => {
+                          const description = window.prompt(`Add description for ${step.label} step:`);
+                          if (description !== null) { 
+                            handleUpdateProgress(step.value, description || `${step.label} completed`);
+                          }
                         }}
+                        disabled={submitting}
+                        sx={{ ml: 2 }}
                       >
-                        <Chip 
-                          label={step.label} 
-                          color={isStepCompleted(step.value) ? "primary" : "default"}
-                          variant={isStepCompleted(step.value) ? "filled" : "outlined"}
-                          size="small"
-                          sx={{ mr: 1 }}
-                        />
-                        {isStepCompleted(step.value) ? (
-                          <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
-                            Completed
-                          </Typography>
-                        ) : (
-                          <Button 
-                            size="small" 
-                            variant="outlined"
-                            onClick={() => {
-                              const description = window.prompt(`Add description for ${step.label} step:`);
-                              if (description) {
-                                handleUpdateProgress(step.value, description);
-                              }
-                            }}
-                            disabled={submitting}
-                          >
-                            Mark as Done
-                          </Button>
-                        )}
-                      </Box>
-                    </Grid>
-                  ))}
-                </Grid>
-              </Paper>
+                        Mark as Done
+                      </Button>
+                    )}
+                  </Box>
+                ))}
+              </Stack>
               
-              {/* Progress History */}
               {ticket && ticket.progress && ticket.progress.length > 0 && (
                 <Box mt={3}>
                   <Typography variant="subtitle1" gutterBottom>
@@ -409,32 +405,6 @@ function AdminTicketDetails() {
               )}
             </CardContent>
           </Card>
-        </Grid>
-
-        {/* Right Column: Info, Comments, Cancel */}
-        <Grid item xs={12} md={5}>
-          {/* Ticket Info Card */}
-          <Card sx={{ mb: 3 }}>
-             <CardHeader title="Ticket Information" />
-             <CardContent>
-                <Grid container spacing={1.5}>
-                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Status:</Typography></Grid>
-                  <Grid item xs={7}>{getStatusChip(ticket.status)}</Grid>
-                  
-                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Priority:</Typography></Grid>
-                  <Grid item xs={7}>{getPriorityChip(ticket.priority)}</Grid>
-                  
-                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Category:</Typography></Grid>
-                  <Grid item xs={7}><Chip label={ticket.category} size="small" /></Grid>
-
-                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Client:</Typography></Grid>
-                  <Grid item xs={7}><Typography variant="body2">{ticket.client?.firstName} {ticket.client?.lastName} ({ticket.client?.email})</Typography></Grid>
-                  
-                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Assigned To:</Typography></Grid>
-                  <Grid item xs={7}><Typography variant="body2">{ticket.technician ? `${ticket.technician.firstName} ${ticket.technician.lastName}` : 'Unassigned'}</Typography></Grid>
-                </Grid>
-             </CardContent>
-          </Card>
 
           {/* Comments Card */}
           <Card sx={{ mb: 3 }}>
@@ -471,7 +441,6 @@ function AdminTicketDetails() {
                 )}
               </List>
 
-              {/* Add Comment Form */}
               {ticket && !['closed', 'cancelled'].includes(ticket.status) ? (
                   <Box component="form" onSubmit={handleCommentSubmit} sx={{ mt: 2 }}>
                     <TextField
@@ -532,6 +501,7 @@ function AdminTicketDetails() {
               </CardContent>
             </Card>
           )}
+
         </Grid>
       </Grid>
     </Container>
