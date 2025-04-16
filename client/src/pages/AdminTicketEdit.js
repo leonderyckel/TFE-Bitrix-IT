@@ -21,7 +21,6 @@ function AdminTicketEdit() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    status: '',
     priority: '',
     category: ''
   });
@@ -40,7 +39,6 @@ function AdminTicketEdit() {
         setFormData({
           title: ticket.title,
           description: ticket.description,
-          status: ticket.status,
           priority: ticket.priority,
           category: ticket.category
         });
@@ -157,25 +155,7 @@ function AdminTicketEdit() {
               />
             </Grid>
             
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  label="Status"
-                  required
-                >
-                  <MenuItem value="open">Open</MenuItem>
-                  <MenuItem value="in-progress">In Progress</MenuItem>
-                  <MenuItem value="resolved">Resolved</MenuItem>
-                  <MenuItem value="closed">Closed</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={6}>
               <FormControl fullWidth>
                 <InputLabel>Priority</InputLabel>
                 <Select
@@ -193,7 +173,7 @@ function AdminTicketEdit() {
               </FormControl>
             </Grid>
             
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={6}>
               <FormControl fullWidth>
                 <InputLabel>Category</InputLabel>
                 <Select
