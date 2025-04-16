@@ -15,7 +15,11 @@ import {
   Box,
   Alert,
   CircularProgress,
-  FormHelperText
+  FormHelperText,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  FormLabel
 } from '@mui/material';
 import { createTicket } from '../store/slices/ticketSlice';
 
@@ -25,10 +29,9 @@ const NewTicket = () => {
   const { loading } = useSelector((state) => state.tickets);
 
   const [formData, setFormData] = useState({
-    title: '',
     description: '',
-    priority: 'medium',
-    category: 'software'
+    priority: '',
+    category: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -50,9 +53,6 @@ const NewTicket = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.title.trim()) {
-      newErrors.title = 'Title is required';
-    }
     if (!formData.description.trim()) {
       newErrors.description = 'Description is required';
     }
@@ -74,8 +74,20 @@ const NewTicket = () => {
       return;
     }
     
+    // Generate title from description
+    const words = formData.description.trim().split(/\s+/); // Split by whitespace
+    const generatedTitle = words.slice(0, 3).join(' ');
+
+    // Ensure there's a title even if description is short or empty (though validation prevents empty)
+    const finalTitle = generatedTitle || 'New Ticket'; 
+
+    const ticketData = {
+      ...formData,
+      title: finalTitle // Use generated title
+    };
+
     try {
-      await dispatch(createTicket(formData)).unwrap();
+      await dispatch(createTicket(ticketData)).unwrap(); // Send combined data
       navigate('/tickets');
     } catch (error) {
       setErrors((prev) => ({
@@ -100,50 +112,41 @@ const NewTicket = () => {
         
         <Box component="form" onSubmit={handleSubmit} noValidate>
           <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <TextField
-                required
-                fullWidth
-                label="Ticket Title"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                error={!!errors.title}
-                helperText={errors.title}
-              />
-            </Grid>
-            
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required error={!!errors.category}>
-                <InputLabel>Category</InputLabel>
-                <Select
+              <FormControl component="fieldset" required error={!!errors.category}>
+                <FormLabel component="legend">Category</FormLabel>
+                <RadioGroup
+                  row
+                  aria-label="category"
                   name="category"
                   value={formData.category}
                   onChange={handleChange}
                 >
-                  <MenuItem value="hardware">Hardware</MenuItem>
-                  <MenuItem value="software">Software</MenuItem>
-                  <MenuItem value="network">Network</MenuItem>
-                  <MenuItem value="security">Security</MenuItem>
-                  <MenuItem value="other">Other</MenuItem>
-                </Select>
+                  <FormControlLabel value="hardware" control={<Radio />} label="Hardware" />
+                  <FormControlLabel value="software" control={<Radio />} label="Software" />
+                  <FormControlLabel value="network" control={<Radio />} label="Network" />
+                  <FormControlLabel value="security" control={<Radio />} label="Security" />
+                  <FormControlLabel value="other" control={<Radio />} label="Other" />
+                </RadioGroup>
                 {errors.category && <FormHelperText>{errors.category}</FormHelperText>}
               </FormControl>
             </Grid>
             
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required error={!!errors.priority}>
-                <InputLabel>Priority</InputLabel>
-                <Select
+              <FormControl component="fieldset" required error={!!errors.priority}>
+                <FormLabel component="legend">Priority</FormLabel>
+                <RadioGroup
+                  row
+                  aria-label="priority"
                   name="priority"
                   value={formData.priority}
                   onChange={handleChange}
                 >
-                  <MenuItem value="low">Low</MenuItem>
-                  <MenuItem value="medium">Medium</MenuItem>
-                  <MenuItem value="high">High</MenuItem>
-                  <MenuItem value="critical">Critical</MenuItem>
-                </Select>
+                  <FormControlLabel value="low" control={<Radio sx={{color: 'success.main', '&.Mui-checked': { color: 'success.dark' }}} />} label="Low" />
+                  <FormControlLabel value="medium" control={<Radio sx={{color: 'info.main', '&.Mui-checked': { color: 'info.dark' }}} />} label="Medium" />
+                  <FormControlLabel value="high" control={<Radio sx={{color: 'warning.main', '&.Mui-checked': { color: 'warning.dark' }}} />} label="High" />
+                  <FormControlLabel value="critical" control={<Radio sx={{color: 'error.main', '&.Mui-checked': { color: 'error.dark' }}} />} label="Critical" />
+                </RadioGroup>
                 {errors.priority && <FormHelperText>{errors.priority}</FormHelperText>}
               </FormControl>
             </Grid>
