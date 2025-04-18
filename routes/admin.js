@@ -384,6 +384,23 @@ router.get('/admins', async (req, res) => {
   }
 });
 
+// Récupérer la liste des clients (utilisateurs avec rôle client)
+router.get('/clients', async (req, res) => {
+  try {
+    // Assurez-vous que getModels() peut accéder au modèle User de la base de données client
+    const { User } = getModels(); 
+    
+    // Récupérer uniquement les utilisateurs avec le rôle 'client'
+    // Sélectionnez les champs nécessaires pour l'affichage (id, nom, email)
+    const clients = await User.find({ role: 'client' }).select('_id firstName lastName email').lean();
+    
+    res.json(clients);
+  } catch (error) {
+    console.error('Error fetching clients for admin:', error);
+    res.status(500).json({ message: 'Erreur serveur lors de la récupération des clients', error: error.message });
+  }
+});
+
 // Créer un nouvel administrateur
 router.post('/admins', async (req, res) => {
   try {
@@ -401,6 +418,53 @@ router.post('/admins', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Créer un nouveau ticket pour un client spécifique (par l'admin)
+router.post('/tickets', async (req, res) => {
+  try {
+    const { title, description, priority, category, clientId } = req.body;
+    // Assurez-vous que getModels() peut accéder aux deux modèles
+    const { Ticket, User } = getModels(); 
+
+    // Validation simple des champs requis
+    if (!title || !description || !priority || !category || !clientId) {
+      return res.status(400).json({ message: 'Missing required fields (title, description, priority, category, clientId)' });
+    }
+
+    // Vérifier que le clientId correspond à un utilisateur existant
+    const clientExists = await User.findById(clientId);
+    if (!clientExists) {
+      return res.status(404).json({ message: 'Client specified by clientId not found' });
+    }
+    // Optionnel : Vérifier que l'utilisateur trouvé est bien un client
+    // if (clientExists.role !== 'client') {
+    //   return res.status(400).json({ message: 'Specified user is not a client' });
+    // }
+
+    // Créer le ticket
+    const newTicket = new Ticket({
+      title,
+      description,
+      priority,
+      category,
+      client: clientId, // Assigner le client spécifié
+      status: 'open', // Statut initial
+      progress: [{
+        status: 'logged',
+        description: 'Ticket created by admin',
+        date: new Date(),
+        updatedBy: req.admin._id // L'admin qui a créé le ticket
+      }]
+    });
+
+    await newTicket.save();
+    res.status(201).json(newTicket);
+
+  } catch (error) {
+    console.error('Error creating ticket for client by admin:', error);
+    res.status(500).json({ message: 'Server error creating ticket', error: error.message });
   }
 });
 

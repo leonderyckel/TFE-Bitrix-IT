@@ -19,6 +19,7 @@ import AdminTicketDetails from './pages/AdminTicketDetails';
 import AdminTicketEdit from './pages/AdminTicketEdit';
 import AdminSettings from './pages/AdminSettings';
 import AdminLogin from './pages/AdminLogin';
+import AdminCreateTicket from './pages/AdminCreateTicket';
 
 // Create theme
 const theme = createTheme({
@@ -197,6 +198,14 @@ function App() {
                 element={
                   <PrivateRoute roles={['admin']}>
                     <AdminSettings />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="admin/create-ticket" 
+                element={
+                  <PrivateRoute roles={['admin', 'technician']}>
+                    <AdminCreateTicket />
                   </PrivateRoute>
                 } 
               />

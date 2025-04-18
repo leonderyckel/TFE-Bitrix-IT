@@ -15,6 +15,7 @@ import PendingIcon from '@mui/icons-material/Pending';
 import WarningIcon from '@mui/icons-material/Warning';
 import PriorityHighIcon from '@mui/icons-material/PriorityHigh';
 import CancelIcon from '@mui/icons-material/Cancel';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 
 function AdminDashboard() {
   const { user, token } = useSelector((state) => state.auth);
@@ -112,9 +113,20 @@ function AdminDashboard() {
               <Typography variant="h4" gutterBottom>
                 Admin Dashboard
               </Typography>
-              <Button variant="contained" color="primary" onClick={() => navigate('/admin/settings')}>
-                System Settings
-              </Button>
+              <Box>
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  startIcon={<AddCircleOutlineIcon />} 
+                  onClick={() => navigate('/admin/create-ticket')}
+                  sx={{ mr: 1 }}
+                >
+                  Create Ticket for Client
+                </Button>
+                <Button variant="contained" color="secondary" onClick={() => navigate('/admin/settings')}>
+                  System Settings
+                </Button>
+              </Box>
             </Box>
             <Typography variant="body1" sx={{ mb: 4 }}>
               Welcome to the admin dashboard, {user?.firstName}. Here you can manage users, tickets, and system settings.
