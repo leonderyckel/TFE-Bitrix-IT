@@ -228,15 +228,15 @@ router.post('/tickets/:id/progress', async (req, res) => {
     
     await ticket.save();
     
-    // Add automatic comment for this progress update
-    ticket.comments.push({
-      user: req.admin._id,
-      content: `Status updated to ${req.body.status}: ${req.body.description}`
-    });
-    
-    await ticket.save();
-    
-    // Return the updated ticket
+    // Populate necessary fields before sending back
+    // Assuming 'User' model is used for clients and comment authors in this context
+    await ticket.populate([
+      { path: 'client', select: 'firstName lastName email company' },
+      { path: 'comments.user', select: 'firstName lastName email' }
+      // We don't populate 'technician' as it's cross-DB and handled manually on admin frontend
+    ]);
+
+    // Return the updated and populated ticket
     res.json(ticket);
   } catch (error) {
     console.error('Error adding progress update:', error);
