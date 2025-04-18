@@ -37,7 +37,7 @@ const Login = () => {
       if (user?.role === 'admin' || user?.role === 'technician') {
         navigate('/admin');
       } else {
-        navigate('/dashboard');
+        navigate('/tickets');
       }
     }
   }, [isAuthenticated, navigate, user]);
