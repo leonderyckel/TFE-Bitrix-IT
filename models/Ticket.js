@@ -26,8 +26,7 @@ const ticketSchema = new mongoose.Schema({
     required: true
   },
   technician: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    type: mongoose.Schema.Types.ObjectId
   },
   category: {
     type: String,
@@ -49,8 +48,7 @@ const ticketSchema = new mongoose.Schema({
       required: true
     },
     updatedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
+      type: mongoose.Schema.Types.ObjectId
     }
   }],
   attachments: [{
@@ -59,6 +57,9 @@ const ticketSchema = new mongoose.Schema({
     uploadedAt: {
       type: Date,
       default: Date.now
+    },
+    resolvedBy: {
+      type: mongoose.Schema.Types.ObjectId
     }
   }],
   comments: [{
@@ -80,8 +81,7 @@ const ticketSchema = new mongoose.Schema({
     description: String,
     resolvedAt: Date,
     resolvedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
+      type: mongoose.Schema.Types.ObjectId
     }
   },
   invoice: {

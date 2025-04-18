@@ -57,22 +57,47 @@ exports.getTickets = async (req, res) => {
 // Get single ticket
 exports.getTicket = async (req, res) => {
   try {
-    const { Ticket } = getModels();
+    // Assuming getModels() can access models from both databases
+    // If not, we need the correct way to access AdminUser model from the second DB
+    const { Ticket, AdminUser } = getModels(); 
+    
+    // Fetch the ticket *without* populating technician initially
     const ticket = await Ticket.findById(req.params.id)
       .populate('client', 'firstName lastName email company')
-      .populate('technician', 'firstName lastName email')
+      // .populate('technician', 'firstName lastName email') // Removed populate for cross-DB reference
       .populate('comments.user', 'firstName lastName email');
 
     if (!ticket) {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
-    // Check if user has access to the ticket
+    // Check if user has access to the ticket (Client access check)
     if (req.user.role === 'client' && ticket.client._id.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    res.json(ticket);
+    // Manually fetch technician details from the Admin DB if assigned
+    let ticketObject = ticket.toObject(); // Convert to plain object to modify
+
+    if (ticketObject.technician) {
+      try {
+        const technicianDetails = await AdminUser.findById(ticketObject.technician).select('_id firstName lastName').lean();
+        if (technicianDetails) {
+          ticketObject.technician = technicianDetails; // Replace ID with details object
+        } else {
+          // Technician ID exists but not found in AdminUser DB (handle gracefully)
+          ticketObject.technician = null; 
+        }
+      } catch (adminDbError) {
+        console.error('Error fetching technician details from admin DB:', adminDbError);
+        // Decide how to handle error - maybe return ticket without technician details
+        ticketObject.technician = null; 
+      }
+    } else {
+       ticketObject.technician = null; // Ensure it's explicitly null if not assigned
+    }
+
+    res.json(ticketObject); // Send the modified object
   } catch (error) {
     console.error('Error fetching ticket:', error);
     res.status(500).json({ message: 'Error fetching ticket', error: error.message });

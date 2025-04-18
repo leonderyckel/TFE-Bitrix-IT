@@ -36,6 +36,7 @@ function AdminTicketDetails() {
   const [progressStatus, setProgressStatus] = useState('');
   const [progressNote, setProgressNote] = useState('');
   const [formData, setFormData] = useState(null);
+  const [selectedTechnicianForAssign, setSelectedTechnicianForAssign] = useState('');
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -51,15 +52,23 @@ function AdminTicketDetails() {
   ];
 
   // Fonction pour mettre à jour le statut de progression
-  const handleUpdateProgress = async (progressStatus, description) => {
+  const handleUpdateProgress = async (progressStatus, description, technicianId = null) => {
     try {
       setSubmitting(true);
+
+      const payload = {
+        status: progressStatus,
+        description: description || `Status updated to ${progressStatus}`,
+      };
+
+      // Include technicianId in payload if provided (specifically for 'assigned' status)
+      if (technicianId) {
+        payload.technicianId = technicianId;
+      }
+
       const response = await axios.post(
         `${API_URL}/admin/tickets/${id}/progress`,
-        { 
-          status: progressStatus, 
-          description: description || `Status updated to ${progressStatus}`
-        },
+        payload,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -315,7 +324,16 @@ function AdminTicketDetails() {
                   <Grid item xs={7}><Typography variant="body2">{ticket.client?.firstName} {ticket.client?.lastName} ({ticket.client?.email})</Typography></Grid>
                   
                   <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Assigned To:</Typography></Grid>
-                  <Grid item xs={7}><Typography variant="body2">{ticket.technician ? `${ticket.technician.firstName} ${ticket.technician.lastName}` : 'Unassigned'}</Typography></Grid>
+                  <Grid item xs={7}>
+                    <Typography variant="body2">
+                      {(() => {
+                        if (!ticket.technician) return 'Unassigned';
+                        // Find the technician in the state array using the stored ID
+                        const assignedTech = technicians.find(tech => tech._id === ticket.technician);
+                        return assignedTech ? `${assignedTech.firstName} ${assignedTech.lastName}` : 'Technician details not found';
+                      })()}
+                    </Typography>
+                  </Grid>
                 </Grid>
              </CardContent>
           </Card>
@@ -349,20 +367,47 @@ function AdminTicketDetails() {
                         Completed
                       </Typography>
                     ) : (
-                      <Button 
-                        size="small" 
-                        variant="outlined"
-                        onClick={() => {
-                          const description = window.prompt(`Add description for ${step.label} step:`);
-                          if (description !== null) { 
-                            handleUpdateProgress(step.value, description || `${step.label} completed`);
-                          }
-                        }}
-                        disabled={submitting}
-                        sx={{ ml: 2 }}
-                      >
-                        Mark as Done
-                      </Button>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {step.value === 'assigned' && (
+                          <FormControl size="small" sx={{ minWidth: 150 }}>
+                            <InputLabel id={`assign-tech-label-${step.value}`}>Assign To</InputLabel>
+                            <Select
+                              labelId={`assign-tech-label-${step.value}`}
+                              value={selectedTechnicianForAssign}
+                              label="Assign To"
+                              onChange={(e) => setSelectedTechnicianForAssign(e.target.value)}
+                            >
+                              <MenuItem value="">
+                                <em>Select Technician</em>
+                              </MenuItem>
+                              {technicians.map((tech) => (
+                                <MenuItem key={tech._id} value={tech._id}>
+                                  {tech.firstName} {tech.lastName}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        )}
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => {
+                            const description = window.prompt(`Add description for ${step.label} step:`);
+                            if (description !== null) {
+                              if (step.value === 'assigned') {
+                                // Pass selected technician ID for assignment
+                                handleUpdateProgress(step.value, description || `${step.label} completed`, selectedTechnicianForAssign);
+                              } else {
+                                handleUpdateProgress(step.value, description || `${step.label} completed`);
+                              }
+                            }
+                          }}
+                          disabled={submitting || (step.value === 'assigned' && !selectedTechnicianForAssign)} // Disable if assigning and no tech selected
+                          sx={{ ml: step.value !== 'assigned' ? 2 : 0 }} // Adjust margin
+                        >
+                          Mark as Done
+                        </Button>
+                      </Box>
                     )}
                   </Box>
                 ))}

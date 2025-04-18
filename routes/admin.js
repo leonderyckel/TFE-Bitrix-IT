@@ -3,6 +3,7 @@ const router = express.Router();
 const adminAuth = require('../middleware/adminAuth');
 const { getModels } = require('../models');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 
 // Route de connexion admin
 router.post('/login', async (req, res) => {
@@ -196,6 +197,19 @@ router.post('/tickets/:id/progress', async (req, res) => {
       return res.status(400).json({ message: 'Description is required' });
     }
     
+    // Check for technician assignment if status is 'assigned'
+    let technicianId = null;
+    if (req.body.status === 'assigned') {
+      if (!req.body.technicianId) {
+        return res.status(400).json({ message: 'Technician ID is required when assigning' });
+      }
+      // Basic validation if technicianId is a valid ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(req.body.technicianId)) {
+         return res.status(400).json({ message: 'Invalid Technician ID format' });
+      }
+      technicianId = req.body.technicianId;
+    }
+
     // Add progress update
     ticket.progress.push({
       status: req.body.status,
@@ -204,11 +218,12 @@ router.post('/tickets/:id/progress', async (req, res) => {
       updatedBy: req.admin._id
     });
     
-    // Update ticket status if needed
+    // Update ticket status and technician if needed
     if (req.body.status === 'closed') {
       ticket.status = 'closed';
-    } else if (req.body.status === 'assigned') {
-      ticket.status = 'in-progress';
+    } else if (req.body.status === 'assigned' && technicianId) {
+      ticket.status = 'in-progress'; // Keep or adjust as needed
+      ticket.technician = technicianId; // Assign technician
     }
     
     await ticket.save();
