@@ -497,6 +497,7 @@ router.get('/calendar-tickets', async (req, res) => {
     // Trouver les tickets qui ont une étape 'scheduled' ou 'rescheduled' avec une scheduledDate
     // On ne récupère que les champs nécessaires pour l'efficacité
     const tickets = await Ticket.find({
+      status: { $ne: 'cancelled' }, // Exclure les tickets annulés
       progress: {
         $elemMatch: {
           status: { $in: ['scheduled', 'rescheduled'] },
@@ -524,9 +525,13 @@ router.get('/calendar-tickets', async (req, res) => {
       console.log(`[Calendar] Processing ticket ${ticket._id}. Latest progress:`, latestScheduledProgress);
 
       if (latestScheduledProgress) {
+        const clientName = ticket.client ? `${ticket.client.firstName} ${ticket.client.lastName}` : 'N/A';
+        const ticketTitle = ticket.title;
         events.push({
           id: ticket._id,
-          title: `${ticket.client ? ticket.client.firstName + ' ' + ticket.client.lastName : 'N/A'} - ${ticket.title}`,
+          title: `${clientName} - ${ticketTitle}`, // Keep original title for basic tooltip/accessibility
+          clientName: clientName,
+          ticketTitle: ticketTitle,
           start: latestScheduledProgress.scheduledDate, // Utiliser la date trouvée
           end: new Date(latestScheduledProgress.scheduledDate.getTime() + 60 * 60 * 1000), // Ajouter 1h pour l'affichage
           description: latestScheduledProgress.description || 'Scheduled event', // Utiliser la description du progrès
