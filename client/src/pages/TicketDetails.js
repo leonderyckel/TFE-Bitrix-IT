@@ -20,7 +20,9 @@ import {
   ListItem, 
   ListItemText,
   ListItemIcon,
-  TextField
+  TextField,
+  ListItemAvatar,
+  Avatar
 } from '@mui/material';
 import { 
   AccessTime as AccessTimeIcon,
@@ -30,7 +32,9 @@ import {
   Info as InfoIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
-  Sync as SyncIcon
+  Sync as SyncIcon,
+  Comment as CommentIcon,
+  History as HistoryIcon
 } from '@mui/icons-material';
 import { fetchTicket, addComment, closedTicket } from '../store/slices/ticketSlice';
 
@@ -160,6 +164,21 @@ function TicketDetails() {
     return progressEntry ? progressEntry.description : '';
   };
 
+  // Map status values to more readable labels for the history list
+  const progressStatusLabels = {
+    'logged': 'Logged',
+    'assigned': 'Assigned',
+    'quote-sent': 'Quote Sent',
+    'hardware-ordered': 'Hardware Ordered',
+    'scheduled': 'Scheduled',
+    'rescheduled': 'Rescheduled',
+    'closed': 'Closed'
+  };
+
+  // Keep the Stepper logic for the top visual progress bar
+  const completedSteps = getCompletedSteps(currentTicket);
+  const activeStep = getActiveStepIndex(currentTicket);
+
   if (loading) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4, display: 'flex', justifyContent: 'center' }}>
@@ -210,11 +229,36 @@ function TicketDetails() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h4" component="h1">
-          Ticket Details
-        </Typography>
-        <Button variant="outlined" onClick={() => navigate('/tickets')}>
+      {/* Header matching TicketList style */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        mb: 3,
+        bgcolor: 'primary.main', // Use primary blue color
+        borderRadius: '8px', // Match TicketList explicit border radius
+        color: 'primary.contrastText', // Set text color to white
+        p: 2 // Match TicketList padding
+      }}>
+        <Box>
+          <Typography variant="h5" component="h1" sx={{ mb: 0, color: 'inherit', fontWeight: 'bold' }}>
+            Ticket Details: {currentTicket.title}
+          </Typography>
+        </Box>
+        {/* Keep the existing outlined button style for now */}
+        <Button 
+          variant="outlined" 
+          size="small" 
+          onClick={() => navigate('/tickets')}
+          sx={{ 
+            color: 'primary.contrastText', 
+            borderColor: 'rgba(255, 255, 255, 0.5)', 
+            '&:hover': { 
+              borderColor: 'primary.contrastText', 
+              bgcolor: 'rgba(255, 255, 255, 0.1)' 
+            } 
+          }}
+        >
           Back to Tickets
         </Button>
       </Box>
@@ -291,121 +335,100 @@ function TicketDetails() {
           </Paper>
         </Grid>
 
-        {/* Progress Tracking Card */}
+        {/* Ticket Progress Tracking Card */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3, height: '100%' }}>
             <Typography variant="h6" gutterBottom>
               Ticket Progress Tracking
             </Typography>
-            <Divider sx={{ my: 2 }} />
-            
-            <Box sx={{ width: '100%', my: 3 }}>
-              <Stepper 
-                activeStep={getActiveStepIndex(currentTicket)} 
-                alternativeLabel
-                sx={{
-                  '& .MuiStepConnector-root': {
-                    '& .MuiStepConnector-line': {
-                      borderColor: 'primary.main',
-                      borderTopWidth: '2px'
-                    },
-                    '&.Mui-active .MuiStepConnector-line': {
-                      borderColor: 'primary.main'
-                    },
-                    '&.Mui-completed .MuiStepConnector-line': {
-                      borderColor: 'primary.main'
-                    }
-                  }
-                }}
-              >
-                {getCompletedSteps(currentTicket).map((label, index) => {
-                  const isInProgress = label === 'In Progress';
-                  const isClosed = label === 'Closed';
-                  
-                  let textColor = {};
-                  if (isInProgress) {
-                    textColor = { color: 'warning.main', fontWeight: 'bold' };
-                  } else if (isClosed) {
-                    textColor = { color: 'success.main', fontWeight: 'bold' };
-                  }
-                  
-                  return (
-                    <Step 
-                      key={index} 
-                      completed={index < getActiveStepIndex(currentTicket)}
-                      sx={{
-                        '& .MuiStepIcon-root': {
-                          color: isClosed ? 'success.main' : (isInProgress ? 'warning.main' : 'primary.main'),
-                          '&.Mui-completed': {
-                            color: 'primary.main'
-                          },
+            {/* Restore specific styling for the Stepper */}
+            <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 3 }}>
+              {completedSteps.map((label, index) => {
+                const isActive = index === activeStep;
+                const isInProgress = isActive && label === 'In Progress'; // Check if it's the active In Progress step
+
+                return (
+                  <Step key={label} completed={index < activeStep}>
+                    <StepLabel
+                      StepIconProps={{
+                        sx: {
+                          // Style the icon container for the active 'In Progress' step
                           '&.Mui-active': {
-                            color: isClosed ? 'success.main' : 'warning.main'
+                            color: isInProgress ? 'warning.main' : undefined, 
+                            // Hide the text number inside the active 'In Progress' icon
+                            '& .MuiStepIcon-text': { 
+                              fill: isInProgress ? 'transparent' : undefined, 
+                            }
                           },
-                          '& text': {
-                            fill: 'transparent' // Hide the numbers inside the circle
-                          }
-                        }
+                          // Completed icons remain default (primary)
+                          // Inactive icons remain default
+                        },
+                      }}
+                      sx={{
+                        // Style the label text for the active 'In Progress' step
+                        '& .MuiStepLabel-label': {
+                          '&.Mui-active': {
+                            color: isInProgress ? 'warning.main' : undefined,
+                            fontWeight: isInProgress ? 'medium' : undefined,
+                          },
+                          // Completed labels remain default
+                          // Inactive labels remain default
+                        },
                       }}
                     >
-                      <StepLabel
-                        sx={{
-                          '& .MuiStepLabel-label': textColor
-                        }}
-                      >
-                        {label}
-                      </StepLabel>
-                    </Step>
-                  );
-                })}
-              </Stepper>
-            </Box>
+                      {label}
+                    </StepLabel>
+                  </Step>
+                );
+              })}
+            </Stepper>
+            <Divider sx={{ my: 2 }} />
 
-            {currentTicket.progress && currentTicket.progress.length > 0 && (
-              <Box mt={3}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Historique de progression
-                </Typography>
-                <List>
-                  {currentTicket.progress.map((progress, index) => {
-                    const statusMap = {
-                      'logged': 'Logged',
-                      'assigned': 'Assigned',
-                      'quote-sent': 'Quote Sent',
-                      'hardware-ordered': 'Hardware Ordered',
-                      'scheduled': 'Scheduled', 
-                      'rescheduled': 'Rescheduled',
-                      'completed': 'Completed'
-                    };
-                    
-                    return (
-                      <ListItem key={index} divider={index < currentTicket.progress.length - 1}>
-                        <ListItemText
-                          primary={statusMap[progress.status] || progress.status}
-                          secondary={
-                            <>
-                              <Typography variant="body2" color="text.secondary">
-                                {progress.description}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {new Date(progress.date).toLocaleString()}
-                              </Typography>
-                            </>
-                          }
-                        />
-                      </ListItem>
-                    );
-                  })}
-                </List>
-              </Box>
+            {/* Progress History List (like admin view) */}
+            <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <HistoryIcon fontSize="small" />
+              Progress History
+            </Typography>
+            {currentTicket.progress && currentTicket.progress.length > 0 ? (
+              <List dense sx={{ maxHeight: 200, overflow: 'auto', bgcolor: 'background.paper', p: 0 }}>
+                {currentTicket.progress.map((progress, index) => (
+                  <ListItem key={index} divider={index < currentTicket.progress.length - 1}>
+                     <ListItemAvatar sx={{ minWidth: 40}}>
+                       <Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.light', fontSize: '0.8rem' }}>
+                         {index + 1}
+                       </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={
+                        <Typography variant="body2" fontWeight="medium">
+                           {progressStatusLabels[progress.status] || progress.status} 
+                        </Typography>
+                      }
+                      secondary={
+                        <>
+                          <Typography variant="body2" component="span" color="text.secondary">
+                            {progress.description}
+                          </Typography>
+                          <Typography variant="caption" display="block" color="text.secondary">
+                            {new Date(progress.date).toLocaleString()}
+                          </Typography>
+                        </>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Typography variant="body2" color="text.secondary">No progress history yet.</Typography>
             )}
           </Paper>
         </Grid>
 
-        {/* Comments and Updates Section */}
+        {/* Updates and Comments Card */}
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CommentIcon fontSize="small" />
               Updates and Comments
             </Typography>
             <Divider sx={{ my: 2 }} />
