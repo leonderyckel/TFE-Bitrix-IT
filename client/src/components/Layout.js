@@ -25,7 +25,8 @@ import {
   Person as PersonIcon,
   People as ClientsIcon,
   Settings as SettingsIcon,
-  MoreVert as MoreVertIcon
+  MoreVert as MoreVertIcon,
+  CalendarMonth as CalendarMonthIcon
 } from '@mui/icons-material';
 import { logout } from '../store/slices/authSlice';
 import Logo from './Logo';
@@ -65,16 +66,20 @@ const Layout = () => {
   };
 
   const isActive = (path) => {
+    if (path === '/admin/calendar') {
+       return location.pathname === path;
+    }
     return location.pathname.startsWith(path);
   };
 
   const menuItems = isAdmin ? [
     { text: 'Tickets', icon: <SupportIcon />, path: '/admin' },
+    { text: 'Calendar', icon: <CalendarMonthIcon />, path: '/admin/calendar' },
     { text: 'Clients', icon: <ClientsIcon />, path: '/clients' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' }
   ] : [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Tickets', icon: <SupportIcon />, path: '/tickets' }
+    { text: 'Tickets', icon: <SupportIcon />, path: '/tickets' },
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' }
   ];
 
   const drawer = (

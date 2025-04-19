@@ -49,6 +49,9 @@ const ticketSchema = new mongoose.Schema({
     },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId
+    },
+    scheduledDate: {
+      type: Date
     }
   }],
   attachments: [{

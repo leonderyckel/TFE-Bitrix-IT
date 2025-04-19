@@ -4,8 +4,7 @@ import {
   Divider, TextField, Button, List, ListItem, 
   ListItemText, ListItemAvatar, Avatar, CircularProgress,
   FormControl, InputLabel, Select, MenuItem, Card, CardContent, CardHeader,
-  Stepper, Step, StepLabel, FormHelperText,
-  Stack
+  Stack, Alert
 } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -19,6 +18,10 @@ import {
 } from '../store/slices/ticketSlice';
 import PriorityHighIcon from '@mui/icons-material/PriorityHigh';
 import CancelIcon from '@mui/icons-material/Cancel';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import dayjs from 'dayjs';
 
 function AdminTicketDetails() {
   const { id } = useParams();
@@ -38,7 +41,9 @@ function AdminTicketDetails() {
   const [formData, setFormData] = useState(null);
   const [selectedTechnicianForAssign, setSelectedTechnicianForAssign] = useState('');
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+
+  // State for inline date/description editing
+  const [scheduleDate, setScheduleDate] = useState(null);
 
   // Définir toutes les étapes possibles de progression
   const allProgressSteps = [
@@ -46,24 +51,27 @@ function AdminTicketDetails() {
     { value: 'assigned', label: 'Assigned', optional: true },
     { value: 'quote-sent', label: 'Quote Sent', optional: true },
     { value: 'hardware-ordered', label: 'Hardware Ordered', optional: true },
-    { value: 'scheduled', label: 'Scheduled', optional: true },
-    { value: 'rescheduled', label: 'Rescheduled', optional: true },
+    { value: 'scheduled', label: 'Scheduled', optional: true, requiresDate: true },
+    { value: 'rescheduled', label: 'Rescheduled', optional: true, requiresDate: true },
     { value: 'closed', label: 'Done', optional: true }
   ];
 
   // Fonction pour mettre à jour le statut de progression
-  const handleUpdateProgress = async (progressStatus, description, technicianId = null) => {
+  const handleUpdateProgress = async (progressStatus, description, technicianId = null, dateValue = null) => {
     try {
       setSubmitting(true);
+      setError(null);
 
       const payload = {
         status: progressStatus,
         description: description || `Status updated to ${progressStatus}`,
       };
 
-      // Include technicianId in payload if provided (specifically for 'assigned' status)
       if (technicianId) {
         payload.technicianId = technicianId;
+      }
+      if (dateValue) {
+        payload.scheduledDate = dateValue.toISOString();
       }
 
       const response = await axios.post(
@@ -76,6 +84,8 @@ function AdminTicketDetails() {
         }
       );
       setTicket(response.data);
+      setScheduleDate(null);
+
     } catch (error) {
       console.error('Error adding progress update:', error);
       setError('Failed to add progress update. ' + (error.response?.data?.message || error.message));
@@ -273,9 +283,10 @@ function AdminTicketDetails() {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-       {/* Header */}
-       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        {/* Header */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Box>
             <Typography variant="h4" component="h1" gutterBottom>
               Ticket: {ticket.title}
@@ -292,264 +303,298 @@ function AdminTicketDetails() {
           </Button>
         </Box>
 
-      <Grid container spacing={3}>
-        {/* Combined Sections in a single full-width column */}
-        <Grid item xs={12} md={12}>
-          
-          {/* Description Card */}
-          <Card sx={{ mb: 3 }}>
-            <CardHeader title="Description" />
-            <CardContent>
-              <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                {ticket.description}
-              </Typography>
-            </CardContent>
-          </Card>
-
-          {/* Ticket Info Card */}
-          <Card sx={{ mb: 3 }}>
-             <CardHeader title="Ticket Information" />
-             <CardContent>
-                <Grid container spacing={1.5}>
-                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Status:</Typography></Grid>
-                  <Grid item xs={7}>{getStatusChip(ticket.status)}</Grid>
-                  
-                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Priority:</Typography></Grid>
-                  <Grid item xs={7}>{getPriorityChip(ticket.priority)}</Grid>
-                  
-                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Category:</Typography></Grid>
-                  <Grid item xs={7}><Chip label={ticket.category} size="small" /></Grid>
-
-                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Client:</Typography></Grid>
-                  <Grid item xs={7}><Typography variant="body2">{ticket.client?.firstName} {ticket.client?.lastName} ({ticket.client?.email})</Typography></Grid>
-                  
-                  <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Assigned To:</Typography></Grid>
-                  <Grid item xs={7}>
-                    <Typography variant="body2">
-                      {(() => {
-                        if (!ticket.technician) return 'Unassigned';
-                        // Find the technician in the state array using the stored ID
-                        const assignedTech = technicians.find(tech => tech._id === ticket.technician);
-                        return assignedTech ? `${assignedTech.firstName} ${assignedTech.lastName}` : 'Technician details not found';
-                      })()}
-                    </Typography>
-                  </Grid>
-                </Grid>
-             </CardContent>
-          </Card>
-
-          {/* Progress Tracking Card */}
-          <Card sx={{ mb: 3 }}>
-            <CardHeader title="Progress Tracking" />
-            <CardContent>
-              <Typography variant="subtitle1" gutterBottom>
-                Check completed steps to make them visible to client
-              </Typography>
-              <Stack spacing={2} divider={<Divider flexItem />}>
-                {allProgressSteps.map((step) => (
-                  <Box 
-                    key={step.value}
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      py: 1
-                    }}
-                  >
-                    <Chip 
-                      label={step.label} 
-                      color={isStepCompleted(step.value) ? "primary" : "default"}
-                      variant={isStepCompleted(step.value) ? "filled" : "outlined"}
-                      size="small"
-                    />
-                    {isStepCompleted(step.value) ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Completed
-                      </Typography>
-                    ) : (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {step.value === 'assigned' && (
-                          <FormControl size="small" sx={{ minWidth: 150 }}>
-                            <InputLabel id={`assign-tech-label-${step.value}`}>Assign To</InputLabel>
-                            <Select
-                              labelId={`assign-tech-label-${step.value}`}
-                              value={selectedTechnicianForAssign}
-                              label="Assign To"
-                              onChange={(e) => setSelectedTechnicianForAssign(e.target.value)}
-                            >
-                              <MenuItem value="">
-                                <em>Select Technician</em>
-                              </MenuItem>
-                              {technicians.map((tech) => (
-                                <MenuItem key={tech._id} value={tech._id}>
-                                  {tech.firstName} {tech.lastName}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                        )}
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => {
-                            const description = window.prompt(`Add description for ${step.label} step:`);
-                            if (description !== null) {
-                              if (step.value === 'assigned') {
-                                // Pass selected technician ID for assignment
-                                handleUpdateProgress(step.value, description || `${step.label} completed`, selectedTechnicianForAssign);
-                              } else {
-                                handleUpdateProgress(step.value, description || `${step.label} completed`);
-                              }
-                            }
-                          }}
-                          disabled={submitting || (step.value === 'assigned' && !selectedTechnicianForAssign)} // Disable if assigning and no tech selected
-                          sx={{ ml: step.value !== 'assigned' ? 2 : 0 }} // Adjust margin
-                        >
-                          Mark as Done
-                        </Button>
-                      </Box>
-                    )}
-                  </Box>
-                ))}
-              </Stack>
-              
-              {ticket && ticket.progress && ticket.progress.length > 0 && (
-                <Box mt={3}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Progress History
-                  </Typography>
-                  <List>
-                    {ticket.progress.map((progress, index) => (
-                      <ListItem key={index} divider={index < ticket.progress.length - 1}>
-                        <ListItemAvatar>
-                          <Avatar sx={{ bgcolor: 'primary.main' }}>
-                            {index + 1}
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={
-                            <Typography variant="subtitle2">
-                              {allProgressSteps.find(s => s.value === progress.status)?.label || progress.status}
-                            </Typography>
-                          }
-                          secondary={
-                            <>
-                              <Typography variant="body2" component="span">
-                                {progress.description}
-                              </Typography>
-                              <Typography variant="caption" display="block" color="text.secondary">
-                                {new Date(progress.date).toLocaleString()}
-                              </Typography>
-                            </>
-                          }
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Comments Card */}
-          <Card sx={{ mb: 3 }}>
-            <CardHeader title="Comments" />
-            <CardContent>
-              <List sx={{ maxHeight: 350, overflow: 'auto', mb: 2, p: 0 }}>
-                {ticket.comments && ticket.comments.length > 0 ? (
-                  ticket.comments.map((comment) => (
-                    <React.Fragment key={comment._id}>
-                      <ListItem alignItems="flex-start">
-                        <ListItemAvatar>
-                          <Avatar>{comment.author?.firstName?.[0] || 'U'}</Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={comment.content}
-                          secondary={
-                            <>
-                              <Typography component="span" variant="body2" color="text.primary">
-                                {comment.author?.firstName} {comment.author?.lastName} 
-                                {comment.author?.isAdmin && <Chip label="Admin" size="small" sx={{ ml: 1 }} />}
-                              </Typography>
-                              {" — " + new Date(comment.createdAt).toLocaleString()}
-                            </>
-                          }
-                        />
-                      </ListItem>
-                      <Divider variant="inset" component="li" />
-                    </React.Fragment>
-                  ))
-                ) : (
-                  <ListItem>
-                    <ListItemText primary="No comments yet." />
-                  </ListItem>
-                )}
-              </List>
-
-              {ticket && !['closed', 'cancelled'].includes(ticket.status) ? (
-                  <Box component="form" onSubmit={handleCommentSubmit} sx={{ mt: 2 }}>
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={3}
-                      label="Add a comment"
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                      variant="outlined"
-                      size="small"
-                    />
-                    <Button 
-                      type="submit" 
-                      variant="contained" 
-                      disabled={submitting || cancelling || !comment.trim()}
-                      sx={{ mt: 1 }}
-                      size="small"
-                    >
-                      {submitting ? <CircularProgress size={20} /> : 'Add Comment'}
-                    </Button>
-                  </Box>
-              ) : (
-                  <Typography sx={{ mt: 2 }} color="text.secondary">
-                    Cannot add comments to a {ticket?.status} ticket.
-                  </Typography>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Cancel Ticket Card */}
-          {ticket && !['closed', 'cancelled'].includes(ticket.status) && (
-            <Card>
-              <CardHeader title="Cancel Ticket" />
+        <Grid container spacing={3}>
+          {/* Combined Sections in a single full-width column */}
+          <Grid item xs={12} md={12}>
+            
+            {/* Description Card */}
+            <Card sx={{ mb: 3 }}>
+              <CardHeader title="Description" />
               <CardContent>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={3}
-                  label="Cancellation Reason (Required)"
-                  value={cancellationReason}
-                  onChange={(e) => setCancellationReason(e.target.value)}
-                  variant="outlined"
-                  size="small"
-                  error={!!error && !cancellationReason.trim()}
-                  helperText={error && !cancellationReason.trim() ? error : ''}
-                  sx={{ mb: 1 }}
-                />
-                <Button 
-                  variant="contained" 
-                  color="error"
-                  onClick={handleCancelTicket}
-                  disabled={cancelling || submitting || !cancellationReason.trim()}
-                  fullWidth
-                >
-                  {cancelling ? <CircularProgress size={24} /> : 'Confirm Cancellation'}
-                </Button>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {ticket.description}
+                </Typography>
               </CardContent>
             </Card>
-          )}
 
+            {/* Ticket Info Card */}
+            <Card sx={{ mb: 3 }}>
+               <CardHeader title="Ticket Information" />
+               <CardContent>
+                  <Grid container spacing={1.5}>
+                    <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Status:</Typography></Grid>
+                    <Grid item xs={7}>{getStatusChip(ticket.status)}</Grid>
+                    
+                    <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Priority:</Typography></Grid>
+                    <Grid item xs={7}>{getPriorityChip(ticket.priority)}</Grid>
+                    
+                    <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Category:</Typography></Grid>
+                    <Grid item xs={7}><Chip label={ticket.category} size="small" /></Grid>
+
+                    <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Client:</Typography></Grid>
+                    <Grid item xs={7}><Typography variant="body2">{ticket.client?.firstName} {ticket.client?.lastName} ({ticket.client?.email})</Typography></Grid>
+                    
+                    <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Assigned To:</Typography></Grid>
+                    <Grid item xs={7}>
+                      <Typography variant="body2">
+                        {(() => {
+                          if (!ticket.technician) return 'Unassigned';
+                          // Find the technician in the state array using the stored ID
+                          const assignedTech = technicians.find(tech => tech._id === ticket.technician);
+                          return assignedTech ? `${assignedTech.firstName} ${assignedTech.lastName}` : 'Technician details not found';
+                        })()}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+               </CardContent>
+            </Card>
+
+            {/* Progress Tracking Card */}
+            <Card sx={{ mb: 3 }}>
+              <CardHeader title="Progress Tracking" />
+              <CardContent>
+                <Typography variant="subtitle1" gutterBottom>
+                  Check completed steps to make them visible to client
+                </Typography>
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                <Stack spacing={2} divider={<Divider flexItem />}>
+                  {allProgressSteps.map((step) => (
+                    <Box 
+                      key={step.value}
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'stretch',
+                        py: 1
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <Chip 
+                          label={step.label} 
+                          color={isStepCompleted(step.value) ? "primary" : "default"}
+                          variant={isStepCompleted(step.value) ? "filled" : "outlined"}
+                          size="small"
+                          sx={{ mr: 2 }}
+                        />
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1, justifyContent: 'flex-end' }}>
+                          {isStepCompleted(step.value) ? (
+                            <Typography variant="body2" color="text.secondary">
+                              Completed
+                            </Typography>
+                          ) : step.requiresDate ? (
+                            <>
+                               <DateTimePicker
+                                label={`Select Date & Time`}
+                                value={scheduleDate}
+                                onChange={(newValue) => {
+                                  if (newValue) {
+                                    // Generate a default description
+                                    const defaultDescription = `${step.label} on ${dayjs(newValue).format('YYYY-MM-DD HH:mm')}`;
+                                    handleUpdateProgress(step.value, defaultDescription, null, newValue);
+                                  }
+                                }}
+                                renderInput={(params) => 
+                                  <TextField {...params} 
+                                    size="small" 
+                                    sx={{ minWidth: 200 }} 
+                                    required 
+                                  />
+                                }
+                              />
+                            </>
+                          ) : step.value === 'assigned' ? (
+                            <>
+                              <FormControl size="small" sx={{ minWidth: 150 }}>
+                                <InputLabel id={`assign-tech-label-${step.value}`}>Assign To</InputLabel>
+                                <Select
+                                  labelId={`assign-tech-label-${step.value}`}
+                                  value={selectedTechnicianForAssign}
+                                  label="Assign To"
+                                  onChange={(e) => setSelectedTechnicianForAssign(e.target.value)}
+                                >
+                                  <MenuItem value="">
+                                    <em>Select Technician</em>
+                                  </MenuItem>
+                                  {technicians.map((tech) => (
+                                    <MenuItem key={tech._id} value={tech._id}>
+                                      {tech.firstName} {tech.lastName}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                  const description = window.prompt(`Add description for ${step.label} step:`);
+                                  if (description !== null) {
+                                    handleUpdateProgress(step.value, description || `${step.label} completed`, selectedTechnicianForAssign);
+                                  }
+                                }}
+                                disabled={submitting || !selectedTechnicianForAssign}
+                              >
+                                Mark as Done
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => {
+                                const description = window.prompt(`Add description for ${step.label} step:`);
+                                if (description !== null) {
+                                  handleUpdateProgress(step.value, description || `${step.label} completed`);
+                                }
+                              }}
+                              disabled={submitting}
+                            >
+                              Mark as Done
+                            </Button>
+                          )}
+                        </Box>
+                      </Box>
+                    </Box>
+                  ))}
+                </Stack>
+                
+                {ticket && ticket.progress && ticket.progress.length > 0 && (
+                  <Box mt={3}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Progress History
+                    </Typography>
+                    <List>
+                      {ticket.progress.map((progress, index) => (
+                        <ListItem key={index} divider={index < ticket.progress.length - 1}>
+                          <ListItemAvatar>
+                            <Avatar sx={{ bgcolor: 'primary.main' }}>
+                              {index + 1}
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={
+                              <Typography variant="subtitle2">
+                                {allProgressSteps.find(s => s.value === progress.status)?.label || progress.status}
+                              </Typography>
+                            }
+                            secondary={
+                              <>
+                                <Typography variant="body2" component="span">
+                                  {progress.description}
+                                </Typography>
+                                <Typography variant="caption" display="block" color="text.secondary">
+                                  {new Date(progress.date).toLocaleString()}
+                                </Typography>
+                              </>
+                            }
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Comments Card */}
+            <Card sx={{ mb: 3 }}>
+              <CardHeader title="Comments" />
+              <CardContent>
+                <List sx={{ maxHeight: 350, overflow: 'auto', mb: 2, p: 0 }}>
+                  {ticket.comments && ticket.comments.length > 0 ? (
+                    ticket.comments.map((comment) => (
+                      <React.Fragment key={comment._id}>
+                        <ListItem alignItems="flex-start">
+                          <ListItemAvatar>
+                            <Avatar>{comment.author?.firstName?.[0] || 'U'}</Avatar>
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={comment.content}
+                            secondary={
+                              <>
+                                <Typography component="span" variant="body2" color="text.primary">
+                                  {comment.author?.firstName} {comment.author?.lastName} 
+                                  {comment.author?.isAdmin && <Chip label="Admin" size="small" sx={{ ml: 1 }} />}
+                                </Typography>
+                                {" — " + new Date(comment.createdAt).toLocaleString()}
+                              </>
+                            }
+                          />
+                        </ListItem>
+                        <Divider variant="inset" component="li" />
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <ListItem>
+                      <ListItemText primary="No comments yet." />
+                    </ListItem>
+                  )}
+                </List>
+
+                {ticket && !['closed', 'cancelled'].includes(ticket.status) ? (
+                    <Box component="form" onSubmit={handleCommentSubmit} sx={{ mt: 2 }}>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        label="Add a comment"
+                        value={comment}
+                        onChange={(e) => setComment(e.target.value)}
+                        variant="outlined"
+                        size="small"
+                      />
+                      <Button 
+                        type="submit" 
+                        variant="contained" 
+                        disabled={submitting || cancelling || !comment.trim()}
+                        sx={{ mt: 1 }}
+                        size="small"
+                      >
+                        {submitting ? <CircularProgress size={20} /> : 'Add Comment'}
+                      </Button>
+                    </Box>
+                ) : (
+                    <Typography sx={{ mt: 2 }} color="text.secondary">
+                      Cannot add comments to a {ticket?.status} ticket.
+                    </Typography>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Cancel Ticket Card */}
+            {ticket && !['closed', 'cancelled'].includes(ticket.status) && (
+              <Card>
+                <CardHeader title="Cancel Ticket" />
+                <CardContent>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={3}
+                    label="Cancellation Reason (Required)"
+                    value={cancellationReason}
+                    onChange={(e) => setCancellationReason(e.target.value)}
+                    variant="outlined"
+                    size="small"
+                    error={!!error && !cancellationReason.trim()}
+                    helperText={error && !cancellationReason.trim() ? error : ''}
+                    sx={{ mb: 1 }}
+                  />
+                  <Button 
+                    variant="contained" 
+                    color="error"
+                    onClick={handleCancelTicket}
+                    disabled={cancelling || submitting || !cancellationReason.trim()}
+                    fullWidth
+                  >
+                    {cancelling ? <CircularProgress size={24} /> : 'Confirm Cancellation'}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+          </Grid>
         </Grid>
-      </Grid>
-    </Container>
+      </Container>
+    </LocalizationProvider>
   );
 }
 

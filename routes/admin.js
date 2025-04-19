@@ -210,13 +210,33 @@ router.post('/tickets/:id/progress', async (req, res) => {
       technicianId = req.body.technicianId;
     }
 
-    // Add progress update
-    ticket.progress.push({
+    // Check for scheduled date if status is 'scheduled' or 'rescheduled'
+    let scheduledDate = null;
+    if (['scheduled', 'rescheduled'].includes(req.body.status)) {
+      if (!req.body.scheduledDate) {
+        return res.status(400).json({ message: 'Scheduled date is required for this status' });
+      }
+      scheduledDate = new Date(req.body.scheduledDate); // Convert string to Date object
+      if (isNaN(scheduledDate.getTime())) { // Check if the date is valid
+        return res.status(400).json({ message: 'Invalid scheduled date format' });
+      }
+    }
+
+    // Prepare progress update data
+    const progressData = {
       status: req.body.status,
       description: req.body.description,
       date: new Date(),
       updatedBy: req.admin._id
-    });
+    };
+
+    // Add scheduledDate if applicable
+    if (scheduledDate) {
+      progressData.scheduledDate = scheduledDate;
+    }
+
+    // Add progress update
+    ticket.progress.push(progressData);
     
     // Update ticket status and technician if needed
     if (req.body.status === 'closed') {
@@ -465,6 +485,62 @@ router.post('/tickets', async (req, res) => {
   } catch (error) {
     console.error('Error creating ticket for client by admin:', error);
     res.status(500).json({ message: 'Server error creating ticket', error: error.message });
+  }
+});
+
+// Route pour récupérer les tickets à afficher dans le calendrier
+router.get('/calendar-tickets', async (req, res) => {
+  console.log('[Calendar] Received request for calendar events'); // Log request start
+  try {
+    const { Ticket } = getModels();
+
+    // Trouver les tickets qui ont une étape 'scheduled' ou 'rescheduled' avec une scheduledDate
+    // On ne récupère que les champs nécessaires pour l'efficacité
+    const tickets = await Ticket.find({
+      progress: {
+        $elemMatch: {
+          status: { $in: ['scheduled', 'rescheduled'] },
+          scheduledDate: { $exists: true, $ne: null }
+        }
+      }
+    })
+    .populate('client', 'firstName lastName') // Populater le client pour le titre
+    .select('title client progress'); // Sélectionner les champs nécessaires
+
+    console.log(`[Calendar] Found ${tickets.length} potential tickets`); // Log number of tickets found
+
+    const events = [];
+    tickets.forEach(ticket => {
+      // Trouver la dernière date planifiée dans l'historique de progression
+      let latestScheduledProgress = null;
+      for (let i = ticket.progress.length - 1; i >= 0; i--) {
+        const progress = ticket.progress[i];
+        if (['scheduled', 'rescheduled'].includes(progress.status) && progress.scheduledDate) {
+          latestScheduledProgress = progress;
+          break; // Prendre la plus récente
+        }
+      }
+
+      console.log(`[Calendar] Processing ticket ${ticket._id}. Latest progress:`, latestScheduledProgress);
+
+      if (latestScheduledProgress) {
+        events.push({
+          id: ticket._id,
+          title: `${ticket.client ? ticket.client.firstName + ' ' + ticket.client.lastName : 'N/A'} - ${ticket.title}`,
+          start: latestScheduledProgress.scheduledDate, // Utiliser la date trouvée
+          end: new Date(latestScheduledProgress.scheduledDate.getTime() + 60 * 60 * 1000), // Ajouter 1h pour l'affichage
+          description: latestScheduledProgress.description || 'Scheduled event', // Utiliser la description du progrès
+          resource: { ticketId: ticket._id } // Ressource optionnelle
+        });
+      }
+    });
+
+    console.log(`[Calendar] Generated ${events.length} events:`, events); // Log generated events
+
+    res.json(events);
+  } catch (error) {
+    console.error('Error fetching calendar tickets:', error);
+    res.status(500).json({ message: 'Erreur serveur lors de la récupération des événements du calendrier' });
   }
 });
 
