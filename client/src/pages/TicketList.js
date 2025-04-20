@@ -152,14 +152,14 @@ const TicketList = () => {
             <Table>
               <TableHead sx={{ backgroundColor: theme.palette.grey[100] }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>ID</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Priority</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Category</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Creation Date</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Progress</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', width: '8%' }}>ID</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Title</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Priority</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Category</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', width: '8%' }}>Creation Date</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', width: '29%', minWidth: 260 }}>Progress</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: 'right' }}></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
