@@ -51,113 +51,90 @@ const calendarGlobalStyles = (
     '.rbc-toolbar': {
       marginBottom: theme.spacing(1.5),
       padding: theme.spacing(1, 1.5),
-      borderBottom: `1px solid ${theme.palette.divider}`,
-      backgroundColor: 'transparent'
+      backgroundColor: theme.palette.primary.main,
+      borderRadius: `${theme.shape.borderRadius}px ${theme.shape.borderRadius}px 0 0`,
+      display: 'flex',
+      alignItems: 'center'
     },
-    '.rbc-toolbar button': { // Base style for all toolbar buttons
+    '.rbc-toolbar button': {
       border: 'none',
-      padding: '6px 16px', // MUI default button padding
+      padding: '6px 16px',
       backgroundColor: 'transparent',
       cursor: 'pointer',
       fontWeight: 'bold',
-      textTransform: 'none', // Match example button
+      textTransform: 'none',
       margin: '0 4px',
-      fontSize: '0.875rem', // MUI default button font size
+      fontSize: '0.875rem',
       minWidth: 'auto',
-      borderRadius: theme.shape.borderRadius, // Standard MUI rounding
-      transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease', // Smooth transitions
-      lineHeight: 1.75, // MUI default
-      '&:hover': {
-         backgroundColor: 'transparent' // Reset generic hover
-      },
-      backgroundColor: theme.palette.primary.main,
+      borderRadius: theme.shape.borderRadius,
+      transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
+      lineHeight: 1.75,
       color: theme.palette.primary.contrastText,
-       '&:hover': {
-           backgroundColor: theme.palette.primary.dark,
-       }
+      '&:hover': {
+        backgroundColor: alpha(theme.palette.common.white, 0.1)
+      },
     },
-    // Override for View Buttons (Month, Week, Day) - Outlined style by default
     '.rbc-btn-group > button': { 
-         border: `1px solid ${alpha(theme.palette.primary.main, 0.5)}`,
-         color: theme.palette.primary.main,
-         backgroundColor: 'transparent', // Reset to transparent for outlined
-         padding: '5px 15px', // Adjust padding for outlined
-         '&:hover': {
-             backgroundColor: alpha(theme.palette.primary.main, 0.04), // MUI outlined hover
-             borderColor: theme.palette.primary.main,
-         },
-          // Remove specific :first-of-type/:last-of-type radius, apply to all
-          borderRadius: theme.shape.borderRadius, 
-           '&:not(:first-of-type)': {
-              marginLeft: '-1px' // Overlap borders like ButtonGroup
-          },
-          // Override :active state to prevent default grey flash
-          '&:active': {
-           // Remove specific :active override for default outlined state
-          }
+      border: `1px solid ${alpha(theme.palette.primary.contrastText, 0.5)}`,
+      color: theme.palette.primary.contrastText,
+      backgroundColor: 'transparent',
+      padding: '5px 15px',
+      '&:hover': {
+        backgroundColor: alpha(theme.palette.common.white, 0.08),
+        borderColor: alpha(theme.palette.primary.contrastText, 0.8),
+      },
+      borderRadius: theme.shape.borderRadius, 
+      '&:not(:first-of-type)': {
+        marginLeft: '-1px'
+      },
     },
-    // Style for ACTIVE View Button - Contained style
     '.rbc-btn-group > button.rbc-active': { 
-        backgroundColor: theme.palette.primary.main,
-        color: theme.palette.primary.contrastText,
-        borderColor: theme.palette.primary.main,
-        '&:hover': {
-           backgroundColor: theme.palette.primary.dark,
-           borderColor: theme.palette.primary.dark,
-        },
-        // Ensure active state doesn't get overridden by general :active
-        '&:active': {
-           // Keep active style on click
-            backgroundColor: theme.palette.primary.main,
-            borderColor: theme.palette.primary.main
-        }
+      backgroundColor: theme.palette.primary.dark,
+      color: theme.palette.primary.contrastText,
+      borderColor: theme.palette.primary.dark,
+      '&:hover': {
+        backgroundColor: theme.palette.primary.dark,
+        borderColor: theme.palette.primary.dark,
+      },
     },
-    // Force non-active view buttons to stay transparent during click
-    '.rbc-btn-group > button:not(.rbc-active):active': {
-        backgroundColor: 'transparent !important', // Force transparent background
-        boxShadow: 'none !important' // Remove any click shadow
-    },
-    // Override default button styles (like Today/Back/Next) that should be contained
-    // Use specific classes if possible instead of :not([class*="rbc-active"])
     '.rbc-toolbar button:not(.rbc-btn-group > button)': {
-        backgroundColor: theme.palette.primary.main,
-        color: theme.palette.primary.contrastText,
-        border: 'none', // Ensure no border
-        '&:hover': {
-            backgroundColor: theme.palette.primary.dark,
-        },
-        '&:active': {
-           backgroundColor: theme.palette.primary.dark, // Keep dark on click
-           boxShadow: 'none'
-        }
+      backgroundColor: 'transparent',
+      border: 'none',
+      padding: '6px 12px',
+      '&:hover': {
+        backgroundColor: alpha(theme.palette.common.white, 0.1)
+      },
+      '&:active': {
+        backgroundColor: alpha(theme.palette.common.white, 0.2),
+        boxShadow: 'none'
+      }
     },
-    // Re-apply specific style for Today, Back, Next (Contained) - More robust if classes exist
-    // Placeholder selectors, replace with actual classes if possible
     '.rbc-toolbar .rbc-toolbar-label': {
       fontSize: '1.3em', 
-      fontWeight: 'bold', // Bold title
-      color: theme.palette.text.primary,
-      textAlign: 'center'
+      fontWeight: 'bold',
+      color: theme.palette.primary.contrastText,
+      textAlign: 'center',
+      flexGrow: 1
     },
     '.rbc-header': {
       padding: '8px 3px',
       textAlign: 'center',
       fontWeight: 500,
-      fontSize: '0.7em', // Even smaller header text
-      borderBottom: 'none', // No border below headers
+      fontSize: '0.7em',
+      borderBottom: 'none',
       borderLeft: 'none',
       backgroundColor: 'transparent',
-      color: alpha(theme.palette.text.secondary, 0.8), // Lighter grey text
+      color: alpha(theme.palette.text.secondary, 0.8),
       textTransform: 'uppercase'
     },
     '.rbc-month-view': {
       border: 'none'
     },
     '.rbc-month-row': {
-      borderBottom: 'none' // No border between weeks
+      borderBottom: 'none'
     },
     '.rbc-day-bg': {
-      borderLeft: 'none' // No vertical divider
+      borderLeft: 'none'
     },
     '.rbc-off-range-bg': {
         backgroundColor: alpha(theme.palette.grey[500], 0.05)
@@ -177,54 +154,52 @@ const calendarGlobalStyles = (
     '.rbc-day-bg.rbc-today': {
       backgroundColor: alpha(theme.palette.primary.light, 0.08)
     },
-    // --- Week/Day View Specific Styles ---
-    '.rbc-time-view .rbc-header': { // Header in Time view (Day names + numbers)
-       borderBottom: `1px solid ${theme.palette.divider}`, // Keep border below header
+    '.rbc-time-view .rbc-header': {
+       borderBottom: `1px solid ${theme.palette.divider}`,
        textAlign: 'center',
        padding: theme.spacing(0.5, 0)
     },
-    '.rbc-time-header-content .rbc-header > a': { // Day number link in header
+    '.rbc-time-header-content .rbc-header > a': {
        display: 'block',
-       fontSize: '1.5em', // Larger day number
+       fontSize: '1.5em',
        fontWeight: 400,
        color: theme.palette.text.primary,
        textDecoration: 'none'
     },
-    '.rbc-time-header-content .rbc-header > span': { // Day name (MON, TUE...) in header
+    '.rbc-time-header-content .rbc-header > span': {
        fontSize: '0.7em',
        textTransform: 'uppercase',
        color: theme.palette.text.secondary
     },
-     '.rbc-time-header-cell.rbc-current > a': { // Today's number in Week/Day header
+     '.rbc-time-header-cell.rbc-current > a': {
          color: theme.palette.primary.contrastText + ' !important',
          backgroundColor: theme.palette.primary.main + ' !important',
          borderRadius: '50%',
-         width: '32px', // Slightly larger circle
+         width: '32px',
          height: '32px',
          lineHeight: '32px'
      },
-     '.rbc-time-content': { // Main content area with time slots
-         borderTop: 'none', // No top border needed
-         backgroundColor: theme.palette.background.paper // Ensure white background
+     '.rbc-time-content': {
+         borderTop: 'none',
+         backgroundColor: theme.palette.background.paper
      },
-     '.rbc-time-slot': { // Individual time slot row
-         borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}` // Keep faint horizontal lines
+     '.rbc-time-slot': {
+         borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`
      },
-     '.rbc-time-content > * > * > .rbc-day-slot': { // Day columns within time view
-         borderLeft: 'none' // Ensure no vertical lines
+     '.rbc-time-content > * > * > .rbc-day-slot': {
+         borderLeft: 'none'
      },
-     '.rbc-time-gutter': { // Time labels on the left
-         fontSize: '0.7em', // Smaller time labels
-         color: alpha(theme.palette.text.secondary, 0.8), // Lighter time labels
-         borderRight: 'none', // No border for gutter
-         backgroundColor: 'transparent' // No background for gutter
+     '.rbc-time-gutter': {
+         fontSize: '0.7em',
+         color: alpha(theme.palette.text.secondary, 0.8),
+         borderRight: 'none',
+         backgroundColor: 'transparent'
      },
      '.rbc-current-time-indicator': {
          backgroundColor: theme.palette.error.main,
-         height: '2px' // Make line slightly thicker
+         height: '2px'
      },
-    // --- End Week/Day View Styles ---
-    '.rbc-date-cell.rbc-current > a': { // Target the anchor inside today's date cell (Month View)
+    '.rbc-date-cell.rbc-current > a': {
         color: theme.palette.primary.contrastText + ' !important',
         backgroundColor: theme.palette.primary.main + ' !important',
         borderRadius: '50%',
