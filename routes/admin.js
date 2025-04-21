@@ -584,4 +584,158 @@ router.get('/calendar-tickets', async (req, res) => {
   }
 });
 
+// --- CLIENT CRUD by Admin ---
+
+// POST /admin/clients - Create a new client user
+router.post('/clients', async (req, res) => {
+  // REMOVING THIS CHECK TO ALLOW TECHNICIANS - RE-ADDING to explicitly allow ONLY technicians
+  // Check if the logged-in user is a technician
+  if (req.admin.role !== 'technician') { 
+      return res.status(403).json({ message: 'Forbidden: Only technicians can create clients.' });
+  }
+  
+  try {
+    const { User, AdminUser } = getModels();
+    const { email, password, firstName, lastName, company } = req.body;
+
+    // Basic validation
+    if (!email || !password || !firstName || !lastName) {
+        return res.status(400).json({ message: 'Missing required fields: email, password, firstName, lastName.' });
+    }
+
+    // Check if user already exists in either database
+    const existingUser = await User.findOne({ email });
+    const existingAdmin = await AdminUser.findOne({ email });
+
+    if (existingUser || existingAdmin) {
+      return res.status(400).json({ message: 'User with this email already exists.' });
+    }
+
+    // Create the new client user in the main User collection
+    const newUser = await User.create({
+      email,
+      password, // Password will be hashed by the pre-save hook in User model
+      firstName,
+      lastName,
+      company, // Company is optional based on schema, handle if required
+      role: 'client' // Explicitly set role
+    });
+
+    // Return only necessary info, exclude password
+    res.status(201).json({
+        _id: newUser._id,
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        company: newUser.company,
+        role: newUser.role
+    });
+
+  } catch (error) {
+    console.error('Error creating client by admin:', error);
+    // Handle potential validation errors from Mongoose
+    if (error.name === 'ValidationError') {
+        return res.status(400).json({ message: 'Validation Error', errors: error.errors });
+    }
+    res.status(500).json({ message: 'Server error while creating client', error: error.message });
+  }
+});
+
+// PUT /admin/clients/:clientId - Update an existing client user
+router.put('/clients/:clientId', async (req, res) => {
+    // Optional: Add role check if only admins can update
+    // if (req.admin.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+    
+    try {
+        const { User } = getModels();
+        const { clientId } = req.params;
+        const { email, firstName, lastName, company } = req.body; // Do not allow role change or password change here
+
+        if (!mongoose.Types.ObjectId.isValid(clientId)) {
+            return res.status(400).json({ message: 'Invalid client ID format' });
+        }
+
+        // Find the client user
+        const client = await User.findById(clientId);
+        if (!client || client.role !== 'client') {
+            return res.status(404).json({ message: 'Client not found' });
+        }
+
+        // Update fields if provided
+        if (email) client.email = email;
+        if (firstName) client.firstName = firstName;
+        if (lastName) client.lastName = lastName;
+        if (company !== undefined) client.company = company; // Allow setting company to empty string
+
+        await client.save();
+
+        // Return updated client info (excluding password)
+        res.json({
+            _id: client._id,
+            email: client.email,
+            firstName: client.firstName,
+            lastName: client.lastName,
+            company: client.company,
+            role: client.role
+        });
+
+    } catch (error) {
+        console.error('Error updating client by admin:', error);
+        // Handle potential validation errors (e.g., duplicate email if changed)
+        if (error.code === 11000) { // Duplicate key error (likely email)
+             return res.status(400).json({ message: 'Email already in use.' });
+        }
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ message: 'Validation Error', errors: error.errors });
+        }
+        res.status(500).json({ message: 'Server error while updating client', error: error.message });
+    }
+});
+
+// DELETE /admin/clients/:clientId - Delete a client user
+router.delete('/clients/:clientId', async (req, res) => {
+    // Only admins should delete clients
+    if (req.admin.role !== 'admin') {
+        return res.status(403).json({ message: 'Forbidden: Only admins can delete clients.' });
+    }
+
+    try {
+        const { User, Ticket } = getModels();
+        const { clientId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(clientId)) {
+            return res.status(400).json({ message: 'Invalid client ID format' });
+        }
+
+        // Find the client to delete
+        const client = await User.findById(clientId);
+        if (!client || client.role !== 'client') {
+            return res.status(404).json({ message: 'Client not found' });
+        }
+
+        // --- Consideration: What to do with tickets associated with this client? ---
+        // Option 1: Delete them (potentially destructive)
+        // await Ticket.deleteMany({ client: clientId });
+        // Option 2: Unassign them or assign to a default admin (safer)
+        // await Ticket.updateMany({ client: clientId }, { $unset: { client: "" } }); // Example: remove client ref
+        // Option 3: Prevent deletion if tickets exist (safest)
+        const associatedTickets = await Ticket.countDocuments({ client: clientId });
+        if (associatedTickets > 0) {
+             return res.status(400).json({ message: `Cannot delete client: They have ${associatedTickets} associated ticket(s). Reassign or delete tickets first.` });
+        }
+        // --- End Consideration ---
+
+        // If deletion is allowed (e.g., no associated tickets)
+        await User.findByIdAndDelete(clientId);
+
+        res.status(200).json({ message: 'Client deleted successfully' });
+
+    } catch (error) {
+        console.error('Error deleting client by admin:', error);
+        res.status(500).json({ message: 'Server error while deleting client', error: error.message });
+    }
+});
+
+// --- END CLIENT CRUD ---
+
 module.exports = router; 
