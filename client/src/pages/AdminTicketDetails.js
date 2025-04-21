@@ -64,14 +64,14 @@ function AdminTicketDetails() {
 
       const payload = {
         status: progressStatus,
-        description: description || `Status updated to ${progressStatus}`,
+        description: description,
       };
 
       if (technicianId) {
         payload.technicianId = technicianId;
       }
-      if (dateValue) {
-        payload.scheduledDate = dateValue.toISOString();
+      if (dateValue && dayjs(dateValue).isValid()) {
+        payload.scheduledDate = dayjs(dateValue).toISOString();
       }
 
       const response = await axios.post(
@@ -387,11 +387,7 @@ function AdminTicketDetails() {
                                 label={`Select Date & Time`}
                                 value={scheduleDate}
                                 onChange={(newValue) => {
-                                  if (newValue) {
-                                    // Generate a default description
-                                    const defaultDescription = `${step.label} on ${dayjs(newValue).format('YYYY-MM-DD HH:mm')}`;
-                                    handleUpdateProgress(step.value, defaultDescription, null, newValue);
-                                  }
+                                  setScheduleDate(newValue);
                                 }}
                                 renderInput={(params) => 
                                   <TextField {...params} 
@@ -401,6 +397,21 @@ function AdminTicketDetails() {
                                   />
                                 }
                               />
+                              <Button
+                                  size="small"
+                                  variant="contained"
+                                  onClick={() => {
+                                      if (scheduleDate && dayjs(scheduleDate).isValid()) {
+                                          handleUpdateProgress(step.value, null, null, scheduleDate);
+                                      } else {
+                                          console.error("Invalid or missing date");
+                                          setError("Please select a valid date and time.");
+                                      }
+                                  }}
+                                  disabled={submitting || !scheduleDate || !dayjs(scheduleDate).isValid()}
+                                >
+                                  Save
+                                </Button>
                             </>
                           ) : step.value === 'assigned' ? (
                             <>
@@ -442,7 +453,7 @@ function AdminTicketDetails() {
                               variant="outlined"
                               onClick={() => {
                                 const description = window.prompt(`Add description for ${step.label} step:`);
-                                if (description !== null) {
+                                 if (description !== null) {
                                   handleUpdateProgress(step.value, description || `${step.label} completed`);
                                 }
                               }}

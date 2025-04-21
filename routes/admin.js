@@ -186,46 +186,65 @@ router.post('/tickets/:id/progress', async (req, res) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
     
+    const { status, description: providedDescription, technicianId: reqTechnicianId, scheduledDate: reqScheduledDate } = req.body;
+
     // Validate the status
     const validStatuses = ['logged', 'assigned', 'quote-sent', 'hardware-ordered', 'scheduled', 'rescheduled', 'closed'];
-    if (!validStatuses.includes(req.body.status)) {
+    if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status', valid: validStatuses });
     }
     
-    // Vérifier que la description est présente
-    if (!req.body.description) {
-      return res.status(400).json({ message: 'Description is required' });
-    }
-    
-    // Check for technician assignment if status is 'assigned'
+    let finalDescription = providedDescription;
     let technicianId = null;
-    if (req.body.status === 'assigned') {
-      if (!req.body.technicianId) {
+    let scheduledDate = null;
+
+    // Handle 'assigned' status
+    if (status === 'assigned') {
+      if (!reqTechnicianId) {
         return res.status(400).json({ message: 'Technician ID is required when assigning' });
       }
-      // Basic validation if technicianId is a valid ObjectId format
-      if (!mongoose.Types.ObjectId.isValid(req.body.technicianId)) {
+      if (!mongoose.Types.ObjectId.isValid(reqTechnicianId)) {
          return res.status(400).json({ message: 'Invalid Technician ID format' });
       }
-      technicianId = req.body.technicianId;
+      technicianId = reqTechnicianId;
+      // Optionally generate default description if none provided for assignment
+      if (!finalDescription) {
+         finalDescription = `Ticket assigned`; // Or fetch tech name if needed
+      }
     }
 
-    // Check for scheduled date if status is 'scheduled' or 'rescheduled'
-    let scheduledDate = null;
-    if (['scheduled', 'rescheduled'].includes(req.body.status)) {
-      if (!req.body.scheduledDate) {
+    // Handle 'scheduled' or 'rescheduled' status
+    if (['scheduled', 'rescheduled'].includes(status)) {
+      if (!reqScheduledDate) {
         return res.status(400).json({ message: 'Scheduled date is required for this status' });
       }
-      scheduledDate = new Date(req.body.scheduledDate); // Convert string to Date object
+      scheduledDate = new Date(reqScheduledDate);
       if (isNaN(scheduledDate.getTime())) { // Check if the date is valid
         return res.status(400).json({ message: 'Invalid scheduled date format' });
       }
+      // --- CHANGE HERE: Generate default description if none provided (in English) ---
+      if (!finalDescription) {
+        const formattedDate = scheduledDate.toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' }); // Changed locale to en-US
+        const statusLabel = status.charAt(0).toUpperCase() + status.slice(1); // Capitalize status
+        finalDescription = `${statusLabel} on ${formattedDate}`; // Changed "le" to "on"
+      }
+      // --- END CHANGE ---
     }
+
+    // --- CHANGE HERE: Final check for description after potential defaults ---
+    // Vérifier que la description est présente (après génération potentielle par défaut)
+    if (!finalDescription) {
+       // Generate a very basic default if somehow still missing
+       finalDescription = `Status updated to ${status}`;
+       // Or return an error if a description is absolutely mandatory even after defaults
+       // return res.status(400).json({ message: 'Description could not be generated and is required' });
+    }
+    // --- END CHANGE ---
 
     // Prepare progress update data
     const progressData = {
-      status: req.body.status,
-      description: req.body.description,
+      status: status,
+      description: finalDescription, // Use the final description
       date: new Date(),
       updatedBy: req.admin._id
     };
@@ -239,9 +258,9 @@ router.post('/tickets/:id/progress', async (req, res) => {
     ticket.progress.push(progressData);
     
     // Update ticket status and technician if needed
-    if (req.body.status === 'closed') {
+    if (status === 'closed') {
       ticket.status = 'closed';
-    } else if (req.body.status === 'assigned' && technicianId) {
+    } else if (status === 'assigned' && technicianId) {
       ticket.status = 'in-progress'; // Keep or adjust as needed
       ticket.technician = technicianId; // Assign technician
     }
@@ -249,11 +268,9 @@ router.post('/tickets/:id/progress', async (req, res) => {
     await ticket.save();
     
     // Populate necessary fields before sending back
-    // Assuming 'User' model is used for clients and comment authors in this context
     await ticket.populate([
       { path: 'client', select: 'firstName lastName email company' },
       { path: 'comments.user', select: 'firstName lastName email' }
-      // We don't populate 'technician' as it's cross-DB and handled manually on admin frontend
     ]);
 
     // Return the updated and populated ticket
