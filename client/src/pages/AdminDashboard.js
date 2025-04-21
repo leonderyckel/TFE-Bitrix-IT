@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Box, Typography, Container, Grid, Paper, Button, 
   Table, TableBody, TableCell, TableContainer, TableHead, 
-  TableRow, TablePagination, Chip, IconButton, Tabs, Tab
+  TableRow, TablePagination, Chip, IconButton, Tabs, Tab,
+  FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
@@ -24,6 +25,8 @@ function AdminDashboard() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [tabValue, setTabValue] = useState(0);
+  const [technicians, setTechnicians] = useState([]);
+  const [selectedTechnicianFilter, setSelectedTechnicianFilter] = useState('all');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -43,7 +46,22 @@ function AdminDashboard() {
       }
     };
 
+    const fetchTechnicians = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/admin/admins`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        const techUsers = response.data.filter(admin => admin.role === 'technician');
+        setTechnicians(techUsers);
+      } catch (error) {
+        console.error('Error fetching technicians:', error);
+      }
+    };
+
     fetchTickets();
+    fetchTechnicians();
   }, [token]);
 
   const handleChangePage = (event, newPage) => {
@@ -57,6 +75,12 @@ function AdminDashboard() {
 
   const handleChangeTab = (event, newValue) => {
     setTabValue(newValue);
+    setPage(0);
+  };
+
+  const handleTechnicianFilterChange = (event) => {
+    setSelectedTechnicianFilter(event.target.value);
+    setPage(0);
   };
 
   const handleViewTicket = (ticketId) => {
@@ -96,12 +120,24 @@ function AdminDashboard() {
   };
 
   const filteredTickets = tickets.filter(ticket => {
-    if (tabValue === 0) return true; // All tickets
-    if (tabValue === 1) return ticket.status === 'open'; // Open tickets
-    if (tabValue === 2) return ticket.status === 'in-progress'; // In progress tickets
-    if (tabValue === 3) return ['resolved', 'closed'].includes(ticket.status); // Resolved tickets
-    if (tabValue === 4) return ticket.status === 'cancelled'; // Cancelled tickets
-    return true;
+    let statusMatch = false;
+    if (tabValue === 0) statusMatch = true;
+    else if (tabValue === 1) statusMatch = ticket.status === 'open';
+    else if (tabValue === 2) statusMatch = ticket.status === 'in-progress';
+    else if (tabValue === 3) statusMatch = ['resolved', 'closed'].includes(ticket.status);
+    else if (tabValue === 4) statusMatch = ticket.status === 'cancelled';
+    else statusMatch = true;
+
+    let technicianMatch = false;
+    if (!selectedTechnicianFilter || selectedTechnicianFilter === 'all') {
+        technicianMatch = true;
+    } else if (selectedTechnicianFilter === 'unassigned') {
+        technicianMatch = !ticket.technician;
+    } else {
+        technicianMatch = ticket.technician && ticket.technician._id === selectedTechnicianFilter;
+    }
+
+    return statusMatch && technicianMatch;
   });
 
   return (
@@ -136,14 +172,38 @@ function AdminDashboard() {
               Ticket Management
             </Typography>
 
-            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-              <Tabs value={tabValue} onChange={handleChangeTab} variant="scrollable" scrollButtons="auto">
-                <Tab label="All Tickets" />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: 1, borderColor: 'divider', mb: 2, flexWrap: 'wrap' }}
+            >
+              <Tabs value={tabValue} onChange={handleChangeTab} variant="scrollable" scrollButtons="auto" sx={{ flexGrow: 1 }}>
+                <Tab label="All Statuses" />
                 <Tab label="Open" />
                 <Tab label="In Progress" />
                 <Tab label="Resolved/Done" />
                 <Tab label="Cancelled" />
               </Tabs>
+
+              <FormControl size="small" sx={{ minWidth: 200, ml: 2, mb: 1 }}>
+                <InputLabel id="technician-filter-label">Assigned To</InputLabel>
+                <Select
+                  labelId="technician-filter-label"
+                  id="technician-filter-select"
+                  value={selectedTechnicianFilter}
+                  label="Assigned To"
+                  onChange={handleTechnicianFilterChange}
+                >
+                  <MenuItem value="all">
+                    <em>All Technicians</em>
+                  </MenuItem>
+                  <MenuItem value="unassigned">
+                    <em>Unassigned</em>
+                  </MenuItem>
+                  {technicians.map((tech) => (
+                    <MenuItem key={tech._id} value={tech._id}>
+                      {tech.firstName} {tech.lastName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Box>
 
             {loading ? (
@@ -160,6 +220,7 @@ function AdminDashboard() {
                         <TableCell>Priority</TableCell>
                         <TableCell>Category</TableCell>
                         <TableCell>Created</TableCell>
+                        <TableCell>Assigned To</TableCell>
                         <TableCell>Actions</TableCell>
                       </TableRow>
                     </TableHead>
@@ -176,6 +237,9 @@ function AdminDashboard() {
                             <TableCell>{getPriorityChip(ticket.priority)}</TableCell>
                             <TableCell>{ticket.category}</TableCell>
                             <TableCell>{new Date(ticket.createdAt).toLocaleString()}</TableCell>
+                            <TableCell>
+                              {ticket.technician ? `${ticket.technician.firstName} ${ticket.technician.lastName}` : 'Unassigned'}
+                            </TableCell>
                             <TableCell>
                               <IconButton 
                                 color="primary" 

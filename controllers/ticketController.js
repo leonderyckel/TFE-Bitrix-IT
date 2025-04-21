@@ -44,7 +44,6 @@ exports.getTickets = async (req, res) => {
 
     const tickets = await Ticket.find(query)
       .populate('client', 'firstName lastName email company')
-      .populate('technician', 'firstName lastName email')
       .sort('-createdAt');
 
     res.json(tickets);

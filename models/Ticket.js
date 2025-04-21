@@ -26,7 +26,8 @@ const ticketSchema = new mongoose.Schema({
     required: true
   },
   technician: {
-    type: mongoose.Schema.Types.ObjectId
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AdminUser'
   },
   category: {
     type: String,

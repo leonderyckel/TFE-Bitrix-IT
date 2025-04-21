@@ -1,34 +1,52 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Calendar, dayjsLocalizer } from 'react-big-calendar';
 import dayjs from 'dayjs';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { Box, Container, Paper, Typography, CircularProgress, Alert, Avatar, useTheme, GlobalStyles, alpha } from '@mui/material';
+import {
+  Box, Container, Typography, CircularProgress, Alert, useTheme,
+  GlobalStyles, alpha,
+  FormControl, FormGroup, FormControlLabel, Checkbox,
+  List, ListItem, ListSubheader
+} from '@mui/material';
 import axios from 'axios';
 import API_URL from '../config/api';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import EventIcon from '@mui/icons-material/Event';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
 
 // Setup the localizer by providing the moment (or dayjs) library
 const localizer = dayjsLocalizer(dayjs);
 
-// Custom Event Component - Back to Google Calendar style
-const CustomEvent = ({ event }) => {
+// Palette de couleurs
+const technicianColors = [
+  '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+  '#8c564b', '#e377c2', '#17becf', '#bcbd22', '#7f7f7f'
+];
+const defaultColor = '#cccccc'; // Gris clair pour non assigné
+
+// Custom Event Component - Let eventPropGetter control background
+const CustomEvent = ({ event, style }) => {
   const theme = useTheme();
   const startTime = dayjs(event.start).format('HH:mm');
+  // Use background color from style prop IF PROVIDED, otherwise default (should always be provided now)
+  const backgroundColor = style?.backgroundColor || defaultColor; 
+  const textColor = theme.palette.getContrastText(backgroundColor);
 
   return (
-    <Box sx={{
+    <Box sx={{ 
+      width: '100%', 
       height: '100%',
       p: '1px 4px',
-      bgcolor: theme.palette.primary.main,
-      color: theme.palette.primary.contrastText,
-      borderRadius: '4px',
+      // bgcolor: backgroundColor, // REMOVED - Let the container style (from eventPropGetter) handle this
+      color: textColor, 
+      borderRadius: '4px', 
       fontSize: '0.7rem',
       overflow: 'hidden',
       display: 'flex',
       alignItems: 'center',
-      lineHeight: 1.3
+      lineHeight: 1.2, 
+      boxSizing: 'border-box'
     }}>
       <Typography variant="caption" sx={{ fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'inherit' }}>
         {startTime} {event.ticketTitle}
@@ -224,72 +242,205 @@ function AdminCalendarView() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [technicians, setTechnicians] = useState([]);
+  const [technicianFilters, setTechnicianFilters] = useState({});
+  const [techColorMap, setTechColorMap] = useState({});
   const { token } = useSelector((state) => state.auth);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchCalendarEvents = async () => {
       try {
-        setLoading(true);
         setError(null);
         const response = await axios.get(`${API_URL}/admin/calendar-tickets`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-
-        // Map the response data to the format required by react-big-calendar
         const formattedEvents = response.data.map(eventData => ({
           id: eventData.id,
-          title: eventData.title,       // Original combined title for tooltip/accessibility
-          clientName: eventData.clientName, // Pass clientName
-          ticketTitle: eventData.ticketTitle, // Pass ticketTitle
-          start: dayjs(eventData.start).toDate(), // Convert ISO string/Date to Date object
-          end: dayjs(eventData.start).add(1, 'hour').toDate(), // Assume 1 hour duration for display
-          resource: eventData.resource, // Store original ticket data if needed
-          description: eventData.description
+          title: eventData.title,
+          clientName: eventData.clientName,
+          ticketTitle: eventData.ticketTitle,
+          start: dayjs(eventData.start).toDate(),
+          end: dayjs(eventData.start).add(1, 'hour').toDate(),
+          resource: eventData.resource,
+          description: eventData.description,
+          technicianId: eventData.technicianId
         }));
-
         setEvents(formattedEvents);
       } catch (err) {
         console.error('Error fetching calendar events:', err);
         setError('Failed to load calendar events. ' + (err.response?.data?.message || err.message));
+      }
+    };
+
+    const fetchTechniciansAndMapColors = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/admin/admins`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        const techUsers = response.data.filter(admin => admin.role === 'technician');
+        setTechnicians(techUsers);
+
+        const colorMap = {};
+        const initialFilters = { all: true, unassigned: false };
+        techUsers.forEach((tech, index) => {
+          colorMap[tech._id] = technicianColors[index % technicianColors.length];
+          initialFilters[tech._id] = false;
+        });
+        setTechColorMap(colorMap);
+        setTechnicianFilters(initialFilters);
+      } catch (error) {
+        console.error('Error fetching technicians:', error);
       } finally {
         setLoading(false);
       }
     };
 
     if (token) {
-      fetchCalendarEvents();
+      setLoading(true);
+      fetchCalendarEvents().then(fetchTechniciansAndMapColors);
+    } else {
+      setLoading(false);
     }
   }, [token]);
 
   const handleSelectEvent = (event) => {
-    // Navigate to the ticket details page when an event is clicked
     if (event.id) {
       navigate(`/admin/tickets/${event.id}`);
     }
   };
 
+  const handleTechnicianCheckboxChange = (event) => {
+    const { name, checked } = event.target;
+
+    setTechnicianFilters(prevFilters => {
+      let newFilters = { ...prevFilters };
+
+      if (name === 'all') {
+        Object.keys(newFilters).forEach(key => {
+          newFilters[key] = false;
+        });
+        newFilters.all = true;
+      } else {
+        newFilters.all = false;
+        newFilters[name] = checked;
+
+        const anySpecificFilterChecked = Object.keys(newFilters).some(key => key !== 'all' && newFilters[key]);
+
+        if (!anySpecificFilterChecked) {
+          newFilters.all = true;
+        }
+      }
+      return newFilters;
+    });
+  };
+
+  const eventStyleGetter = useCallback((event, start, end, isSelected) => {
+    const backgroundColor = techColorMap[event.technicianId] || defaultColor;
+    const style = {
+      backgroundColor,
+      borderRadius: '4px',
+      opacity: 0.9,
+      color: 'white',
+      border: '0px',
+      display: 'block',
+      width: '100%',
+      height: '100%'
+    };
+    return {
+      style: style
+    };
+  }, [techColorMap]);
+
+  const filteredEvents = events.filter(event => {
+    if (technicianFilters.all) {
+      return true;
+    }
+    if (technicianFilters.unassigned && !event.technicianId) {
+      return true;
+    }
+    if (event.technicianId && technicianFilters[event.technicianId]) {
+      return true;
+    }
+    return false;
+  });
+
   return (
     <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
       {calendarGlobalStyles}
       <Box sx={{ p: 0, overflow: 'hidden' }}>
+        <Box sx={{ mb: 2, px: 1, borderBottom: 1, borderColor: 'divider', pb:1 }}>
+           <Typography variant="overline">Filter by Technician:</Typography>
+           <FormGroup sx={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap' }}>
+              <FormControlLabel
+                 control={
+                   <Checkbox
+                     checked={technicianFilters.all || false}
+                     onChange={handleTechnicianCheckboxChange}
+                     name="all"
+                     size="small"
+                   />
+                 }
+                 label="All"
+                 sx={{ mr: 2 }}
+              />
+              <FormControlLabel
+                 control={
+                   <Checkbox
+                     checked={technicianFilters.unassigned || false}
+                     onChange={handleTechnicianCheckboxChange}
+                     name="unassigned"
+                     size="small"
+                     icon={<RadioButtonUncheckedIcon sx={{ color: defaultColor }} />}
+                     checkedIcon={<RadioButtonCheckedIcon sx={{ color: defaultColor }} />}
+                   />
+                 }
+                 label="Unassigned"
+                 sx={{ mr: 2, color: defaultColor }}
+              />
+              {technicians.map((tech) => {
+                  const techColor = techColorMap[tech._id] || defaultColor;
+                  return (
+                      <FormControlLabel
+                         key={tech._id}
+                         control={
+                           <Checkbox
+                             checked={technicianFilters[tech._id] || false}
+                             onChange={handleTechnicianCheckboxChange}
+                             name={tech._id}
+                             size="small"
+                             icon={<RadioButtonUncheckedIcon sx={{ color: techColor }} />}
+                             checkedIcon={<RadioButtonCheckedIcon sx={{ color: techColor }} />}
+                           />
+                         }
+                         label={`${tech.firstName} ${tech.lastName}`}
+                         sx={{ mr: 2, color: techColor }}
+                       />
+                  );
+              })}
+           </FormGroup>
+        </Box>
+
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
         <Box sx={{ height: '80vh' }} className="rbc-calendar">
           {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-              <CircularProgress />
-            </Box>
+             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+               <CircularProgress />
+             </Box>
           ) : (
             <Calendar
               localizer={localizer}
-              events={events}
+              events={filteredEvents}
               startAccessor="start"
               endAccessor="end"
               style={{ height: '100%' }}
               onSelectEvent={handleSelectEvent}
               tooltipAccessor={(event) => `${event.clientName} - ${event.ticketTitle}\n${event.description}`}
               views={['month', 'week', 'day']}
+              eventPropGetter={eventStyleGetter}
               components={{
                 event: CustomEvent,
               }}

@@ -98,26 +98,42 @@ router.get('/profile', (req, res) => {
 // Récupérer tous les tickets
 router.get('/tickets', async (req, res) => {
   try {
-    const { Ticket } = getModels();
+    // Récupérer les modèles depuis les connexions appropriées
+    const { Ticket, AdminUser } = getModels(); // Assurez-vous que AdminUser est bien récupéré ici
+
     const tickets = await Ticket.find({})
       .populate('client', 'firstName lastName email company')
-      .populate('technician', 'firstName lastName email')
+      // --- MODIFICATION ICI ---
+      // Spécifier explicitement le modèle pour populate 'technician'
+      .populate({
+          path: 'technician',
+          select: 'firstName lastName email', // Champs à sélectionner
+          model: AdminUser // Utiliser le modèle AdminUser de la connexion admin
+       })
+      // --- FIN MODIFICATION ---
       .sort('-createdAt');
     
     res.json(tickets);
   } catch (error) {
     console.error('Error fetching tickets for admin:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+    res.status(500).json({ message: 'Erreur serveur', error: error.message }); // Added error details
   }
 });
 
 // Récupérer un ticket spécifique
 router.get('/tickets/:id', async (req, res) => {
   try {
-    const { Ticket } = getModels();
+    const { Ticket, AdminUser } = getModels(); // Assurez-vous que AdminUser est bien récupéré ici
     const ticket = await Ticket.findById(req.params.id)
       .populate('client', 'firstName lastName email company')
-      .populate('technician', 'firstName lastName email')
+      // --- MODIFICATION ICI ---
+      // Spécifier explicitement le modèle pour populate 'technician'
+      .populate({
+          path: 'technician',
+          select: 'firstName lastName email', // Champs à sélectionner
+          model: AdminUser // Utiliser le modèle AdminUser de la connexion admin
+       })
+       // --- FIN MODIFICATION ---
       .populate('comments.user', 'firstName lastName email');
     
     if (!ticket) {
@@ -127,7 +143,7 @@ router.get('/tickets/:id', async (req, res) => {
     res.json(ticket);
   } catch (error) {
     console.error('Error fetching ticket for admin:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+    res.status(500).json({ message: 'Erreur serveur', error: error.message }); // Added error details
   }
 });
 
@@ -523,7 +539,7 @@ router.get('/calendar-tickets', async (req, res) => {
       }
     })
     .populate('client', 'firstName lastName') // Populater le client pour le titre
-    .select('title client progress'); // Sélectionner les champs nécessaires
+    .select('title client progress technician'); // Sélectionner les champs nécessaires + technician
 
     console.log(`[Calendar] Found ${tickets.length} potential tickets`); // Log number of tickets found
 
@@ -544,6 +560,7 @@ router.get('/calendar-tickets', async (req, res) => {
       if (latestScheduledProgress) {
         const clientName = ticket.client ? `${ticket.client.firstName} ${ticket.client.lastName}` : 'N/A';
         const ticketTitle = ticket.title;
+        const technicianId = ticket.technician ? ticket.technician.toString() : null;
         events.push({
           id: ticket._id,
           title: `${clientName} - ${ticketTitle}`, // Keep original title for basic tooltip/accessibility
@@ -552,7 +569,8 @@ router.get('/calendar-tickets', async (req, res) => {
           start: latestScheduledProgress.scheduledDate, // Utiliser la date trouvée
           end: new Date(latestScheduledProgress.scheduledDate.getTime() + 60 * 60 * 1000), // Ajouter 1h pour l'affichage
           description: latestScheduledProgress.description || 'Scheduled event', // Utiliser la description du progrès
-          resource: { ticketId: ticket._id } // Ressource optionnelle
+          resource: { ticketId: ticket._id }, // Ressource optionnelle
+          technicianId: technicianId
         });
       }
     });

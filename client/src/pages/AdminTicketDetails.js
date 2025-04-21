@@ -337,12 +337,12 @@ function AdminTicketDetails() {
                     <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Assigned To:</Typography></Grid>
                     <Grid item xs={7}>
                       <Typography variant="body2">
-                        {(() => {
-                          if (!ticket.technician) return 'Unassigned';
-                          // Find the technician in the state array using the stored ID
-                          const assignedTech = technicians.find(tech => tech._id === ticket.technician);
-                          return assignedTech ? `${assignedTech.firstName} ${assignedTech.lastName}` : 'Technician details not found';
-                        })()}
+                        {ticket.technician && ticket.technician.firstName && ticket.technician.lastName
+                          ? `${ticket.technician.firstName} ${ticket.technician.lastName}`
+                          : ticket.technician 
+                          ? 'Technician details not found' // Case where object exists but names are missing
+                          : 'Unassigned' // Case where technician field is null/undefined
+                        }
                       </Typography>
                     </Grid>
                   </Grid>
