@@ -75,7 +75,7 @@ const Layout = () => {
   const menuItems = isAdmin ? [
     { text: 'Tickets', icon: <SupportIcon />, path: '/admin' },
     { text: 'Calendar', icon: <CalendarMonthIcon />, path: '/admin/calendar' },
-    { text: 'Clients', icon: <ClientsIcon />, path: '/clients' },
+    { text: 'Clients', icon: <ClientsIcon />, path: '/admin/clients' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' }
   ] : [
     { text: 'Tickets', icon: <SupportIcon />, path: '/tickets' },

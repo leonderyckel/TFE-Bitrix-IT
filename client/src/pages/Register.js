@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
-import { register } from '../store/slices/authSlice';
+import { register, loginSuccess } from '../store/slices/authSlice';
 
 const validationSchema = yup.object({
   email: yup
@@ -45,7 +45,13 @@ const validationSchema = yup.object({
 const Register = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading, error } = useSelector((state) => state.auth);
+  const { loading, error, isAuthenticated } = useSelector((state) => state.auth);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/tickets');
+    }
+  }, [isAuthenticated, navigate]);
 
   const formik = useFormik({
     initialValues: {
@@ -57,9 +63,15 @@ const Register = () => {
       company: ''
     },
     validationSchema: validationSchema,
-    onSubmit: (values) => {
+    onSubmit: async (values) => {
       console.log('Register attempt with:', values);
-      dispatch(register(values));
+      const resultAction = await dispatch(register(values));
+
+      if (register.fulfilled.match(resultAction)) {
+        console.log('Registration successful, state updated, redirecting...');
+      } else {
+        console.error('Registration failed:', resultAction.payload || 'Unknown error');
+      }
     }
   });
 
@@ -143,32 +155,15 @@ const Register = () => {
             />
             <TextField
               fullWidth
-              id="role"
-              name="role"
-              select
-              label="Role"
-              value={formik.values.role}
+              id="company"
+              name="company"
+              label="Company"
+              value={formik.values.company}
               onChange={formik.handleChange}
-              error={formik.touched.role && Boolean(formik.errors.role)}
-              helperText={formik.touched.role && formik.errors.role}
+              error={formik.touched.company && Boolean(formik.errors.company)}
+              helperText={formik.touched.company && formik.errors.company}
               margin="normal"
-            >
-              <MenuItem value="client">Client</MenuItem>
-              <MenuItem value="technician">Technician</MenuItem>
-            </TextField>
-            {formik.values.role === 'client' && (
-              <TextField
-                fullWidth
-                id="company"
-                name="company"
-                label="Company"
-                value={formik.values.company}
-                onChange={formik.handleChange}
-                error={formik.touched.company && Boolean(formik.errors.company)}
-                helperText={formik.touched.company && formik.errors.company}
-                margin="normal"
-              />
-            )}
+            />
             <Button
               type="submit"
               fullWidth
