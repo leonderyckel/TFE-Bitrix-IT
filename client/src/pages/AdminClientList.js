@@ -320,6 +320,17 @@ function AdminClientList() {
                 error={formik.touched.company && Boolean(formik.errors.company)}
                 helperText={formik.touched.company && formik.errors.company}
              />
+             <TextField
+                margin="dense"
+                id="address"
+                name="address"
+                label="Address (Optional)"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={formik.values.address || ''}
+                onChange={formik.handleChange}
+             />
              {!isEditing && (
                  <TextField
                     margin="dense"

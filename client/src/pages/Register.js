@@ -60,7 +60,8 @@ const Register = () => {
       firstName: '',
       lastName: '',
       role: 'client',
-      company: ''
+      company: '',
+      address: ''
     },
     validationSchema: validationSchema,
     onSubmit: async (values) => {
@@ -162,6 +163,15 @@ const Register = () => {
               onChange={formik.handleChange}
               error={formik.touched.company && Boolean(formik.errors.company)}
               helperText={formik.touched.company && formik.errors.company}
+              margin="normal"
+            />
+            <TextField
+              fullWidth
+              id="address"
+              name="address"
+              label="Address (Optional)"
+              value={formik.values.address}
+              onChange={formik.handleChange}
               margin="normal"
             />
             <Button

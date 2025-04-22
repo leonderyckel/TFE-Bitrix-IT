@@ -12,7 +12,7 @@ const generateToken = (id, isAdmin = false) => {
 exports.register = async (req, res) => {
   try {
     const { User, AdminUser } = getModels();
-    const { email, password, firstName, lastName, role, company } = req.body;
+    const { email, password, firstName, lastName, role, company, address } = req.body;
 
     // Check if user already exists in either database
     const existingUser = await User.findOne({ email });
@@ -54,7 +54,8 @@ exports.register = async (req, res) => {
       password,
       firstName,
       lastName,
-      company
+      company,
+      address
     });
 
     const token = generateToken(user._id, false);
@@ -66,7 +67,8 @@ exports.register = async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         role: 'client',
-        company: user.company
+        company: user.company,
+        address: user.address
       },
       token
     });

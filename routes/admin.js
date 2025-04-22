@@ -588,15 +588,15 @@ router.get('/calendar-tickets', async (req, res) => {
 
 // POST /admin/clients - Create a new client user
 router.post('/clients', async (req, res) => {
-  // REMOVING THIS CHECK TO ALLOW TECHNICIANS - RE-ADDING to explicitly allow ONLY technicians
   // Check if the logged-in user is a technician
-  if (req.admin.role !== 'technician') { 
+  if (req.admin.role !== 'technician') {
       return res.status(403).json({ message: 'Forbidden: Only technicians can create clients.' });
   }
   
   try {
     const { User, AdminUser } = getModels();
-    const { email, password, firstName, lastName, company } = req.body;
+    // Destructure address
+    const { email, password, firstName, lastName, company, address } = req.body;
 
     // Basic validation
     if (!email || !password || !firstName || !lastName) {
@@ -618,6 +618,7 @@ router.post('/clients', async (req, res) => {
       firstName,
       lastName,
       company, // Company is optional based on schema, handle if required
+      address, // Add address
       role: 'client' // Explicitly set role
     });
 
@@ -628,6 +629,7 @@ router.post('/clients', async (req, res) => {
         firstName: newUser.firstName,
         lastName: newUser.lastName,
         company: newUser.company,
+        address: newUser.address, // Return address
         role: newUser.role
     });
 
@@ -643,53 +645,58 @@ router.post('/clients', async (req, res) => {
 
 // PUT /admin/clients/:clientId - Update an existing client user
 router.put('/clients/:clientId', async (req, res) => {
-    // Optional: Add role check if only admins can update
-    // if (req.admin.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
-    
-    try {
-        const { User } = getModels();
-        const { clientId } = req.params;
-        const { email, firstName, lastName, company } = req.body; // Do not allow role change or password change here
+  // TODO: Consider adding role check here too (e.g., only admin/technician?)
+  try {
+    const { User } = getModels();
+    const { clientId } = req.params;
+    // Destructure address from body
+    const { firstName, lastName, email, company, address } = req.body;
 
-        if (!mongoose.Types.ObjectId.isValid(clientId)) {
-            return res.status(400).json({ message: 'Invalid client ID format' });
-        }
+    // Construct update object, excluding password and role changes
+    const updateData = {
+      firstName,
+      lastName,
+      email,
+      company,
+      address // Include address in update data
+    };
 
-        // Find the client user
-        const client = await User.findById(clientId);
-        if (!client || client.role !== 'client') {
-            return res.status(404).json({ message: 'Client not found' });
-        }
+    // Remove undefined fields to avoid overwriting existing data with null
+    Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
-        // Update fields if provided
-        if (email) client.email = email;
-        if (firstName) client.firstName = firstName;
-        if (lastName) client.lastName = lastName;
-        if (company !== undefined) client.company = company; // Allow setting company to empty string
+    // Find and update the user
+    const updatedUser = await User.findByIdAndUpdate(
+      clientId,
+      { $set: updateData },
+      { new: true, runValidators: true } // Return updated doc, run schema validators
+    );
 
-        await client.save();
-
-        // Return updated client info (excluding password)
-        res.json({
-            _id: client._id,
-            email: client.email,
-            firstName: client.firstName,
-            lastName: client.lastName,
-            company: client.company,
-            role: client.role
-        });
-
-    } catch (error) {
-        console.error('Error updating client by admin:', error);
-        // Handle potential validation errors (e.g., duplicate email if changed)
-        if (error.code === 11000) { // Duplicate key error (likely email)
-             return res.status(400).json({ message: 'Email already in use.' });
-        }
-        if (error.name === 'ValidationError') {
-            return res.status(400).json({ message: 'Validation Error', errors: error.errors });
-        }
-        res.status(500).json({ message: 'Server error while updating client', error: error.message });
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'Client not found.' });
     }
+
+    // Return updated user data (excluding password)
+    res.json({
+        _id: updatedUser._id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        company: updatedUser.company,
+        address: updatedUser.address, // Ensure address is returned
+        role: updatedUser.role
+    });
+
+  } catch (error) {
+    console.error('Error updating client:', error);
+    if (error.name === 'ValidationError') {
+        return res.status(400).json({ message: 'Validation Error', errors: error.errors });
+    }
+    // Handle potential duplicate email error if email is unique
+    if (error.code === 11000) {
+        return res.status(400).json({ message: 'Email already in use.' });
+    }
+    res.status(500).json({ message: 'Server error while updating client', error: error.message });
+  }
 });
 
 // DELETE /admin/clients/:clientId - Delete a client user

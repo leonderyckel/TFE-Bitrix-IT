@@ -36,6 +36,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  address: {
+    type: String,
+    trim: true
+  },
   credentials: {
     type: Map,
     of: String,
@@ -44,7 +48,8 @@ const userSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  tickets: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Ticket' }]
 });
 
 // Combine password hashing and role setting in a single pre-save hook
