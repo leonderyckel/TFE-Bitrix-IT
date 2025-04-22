@@ -445,7 +445,9 @@ router.get('/clients', async (req, res) => {
     
     // Récupérer uniquement les utilisateurs avec le rôle 'client'
     // Sélectionnez les champs nécessaires pour l'affichage (id, nom, email)
-    const clients = await User.find({ role: 'client' }).select('_id firstName lastName email').lean();
+    const clients = await User.find({ role: 'client' })
+                          .select('_id firstName lastName email company address') // Added company and address
+                          .lean();
     
     res.json(clients);
   } catch (error) {
