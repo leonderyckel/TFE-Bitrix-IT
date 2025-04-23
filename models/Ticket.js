@@ -45,7 +45,7 @@ const ticketSchema = new mongoose.Schema({
     },
     status: {
       type: String,
-      enum: ['logged', 'assigned', 'quote-sent', 'hardware-ordered', 'scheduled', 'rescheduled', 'closed'],
+      enum: ['logged', 'assigned', 'quote-sent', 'hardware-ordered', 'scheduled', 'closed'],
       required: true
     },
     description: {

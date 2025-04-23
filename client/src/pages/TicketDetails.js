@@ -119,7 +119,6 @@ function TicketDetails() {
         'quote-sent': 'Quote Sent',
         'hardware-ordered': 'Hardware Ordered',
         'scheduled': 'Scheduled', 
-        'rescheduled': 'Rescheduled',
         'closed': 'Closed'
       };
       return statusMap[p.status] || p.status;
@@ -159,8 +158,7 @@ function TicketDetails() {
         'quote-sent': 'Quote Sent',
         'hardware-ordered': 'Hardware Ordered',
         'scheduled': 'Scheduled',
-        'rescheduled': 'Rescheduled',
-        'completed': 'Completed'
+        'closed': 'Closed'
       };
       return statusMap[p.status] === step;
     });
@@ -175,7 +173,6 @@ function TicketDetails() {
     'quote-sent': 'Quote Sent',
     'hardware-ordered': 'Hardware Ordered',
     'scheduled': 'Scheduled',
-    'rescheduled': 'Rescheduled',
     'closed': 'Closed'
   };
 

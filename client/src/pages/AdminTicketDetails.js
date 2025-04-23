@@ -54,7 +54,6 @@ function AdminTicketDetails() {
     { value: 'quote-sent', label: 'Quote Sent', optional: true },
     { value: 'hardware-ordered', label: 'Hardware Ordered', optional: true },
     { value: 'scheduled', label: 'Scheduled', optional: true, requiresDate: true },
-    { value: 'rescheduled', label: 'Rescheduled', optional: true, requiresDate: true },
     { value: 'closed', label: 'Done', optional: true }
   ];
 
@@ -114,7 +113,7 @@ function AdminTicketDetails() {
   };
 
   useEffect(() => {
-    const fetchTicket = async () => {
+    const loadTicketData = async () => {
       try {
         setLoading(true);
         const response = await axios.get(`${API_URL}/admin/tickets/${id}`, {
@@ -122,7 +121,17 @@ function AdminTicketDetails() {
             Authorization: `Bearer ${token}`
           }
         });
-        setTicket(response.data);
+        const fetchedTicket = response.data;
+        setTicket(fetchedTicket);
+        
+        // Check if the scheduled step is NOT completed and suggestedDate exists
+        const scheduledStepDone = fetchedTicket.progress?.some(p => p.status === 'scheduled');
+        if (!scheduledStepDone && fetchedTicket.suggestedDate) {
+          const suggested = dayjs(fetchedTicket.suggestedDate);
+          if (suggested.isValid()) {
+            setScheduleDate(suggested);
+          }
+        }
         
         // Get technicians
         const techResponse = await axios.get(`${API_URL}/admin/admins`, {
@@ -135,8 +144,8 @@ function AdminTicketDetails() {
         const technicianUsers = techResponse.data.filter(admin => admin.role === 'technician');
         setTechnicians(technicianUsers);
         
-        if (response.data.technician) {
-          setSelectedTechnician(response.data.technician._id);
+        if (fetchedTicket.technician) {
+          setSelectedTechnician(fetchedTicket.technician._id);
         }
       } catch (error) {
         console.error('Error fetching ticket:', error);
@@ -146,7 +155,7 @@ function AdminTicketDetails() {
       }
     };
 
-    fetchTicket();
+    loadTicketData();
   }, [id, token]);
 
   const handleCommentSubmit = async (e) => {
