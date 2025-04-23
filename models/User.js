@@ -40,6 +40,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  isCompanyBoss: {
+    type: Boolean,
+    default: false
+  },
   credentials: {
     type: Map,
     of: String,

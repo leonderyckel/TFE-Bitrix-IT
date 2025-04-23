@@ -446,7 +446,7 @@ router.get('/clients', async (req, res) => {
     // Récupérer uniquement les utilisateurs avec le rôle 'client'
     // Sélectionnez les champs nécessaires pour l'affichage (id, nom, email)
     const clients = await User.find({ role: 'client' })
-                          .select('_id firstName lastName email company address') // Added company and address
+                          .select('_id firstName lastName email company address isCompanyBoss') // Added isCompanyBoss
                           .lean();
     
     res.json(clients);
@@ -647,24 +647,45 @@ router.post('/clients', async (req, res) => {
 
 // PUT /admin/clients/:clientId - Update an existing client user
 router.put('/clients/:clientId', async (req, res) => {
-  // TODO: Consider adding role check here too (e.g., only admin/technician?)
   try {
     const { User } = getModels();
     const { clientId } = req.params;
-    // Destructure address from body
-    const { firstName, lastName, email, company, address } = req.body;
+    // Destructure isCompanyBoss from body, remove role
+    const { firstName, lastName, email, company, address, isCompanyBoss } = req.body;
 
-    // Construct update object, excluding password and role changes
+    // --- Security Check: Only Admins or Technicians can change the boss flag ---
+    const allowedRoles = ['admin', 'technician'];
+    // Check if isCompanyBoss is provided and user is not an allowed role
+    if (isCompanyBoss !== undefined && !allowedRoles.includes(req.admin.role)) {
+        return res.status(403).json({ message: 'Forbidden: Only administrators or technicians can change the boss status.' });
+    }
+    // Basic type validation if provided
+    if (isCompanyBoss !== undefined && typeof isCompanyBoss !== 'boolean') {
+        return res.status(400).json({ message: 'Invalid value for isCompanyBoss. Must be true or false.' });
+    }
+    // --- End Security Check ---
+
+    // Construct update object (role is no longer updated here)
     const updateData = {
       firstName,
       lastName,
       email,
       company,
-      address // Include address in update data
+      address
     };
 
+    // Add isCompanyBoss to updateData ONLY if it was provided AND the user is an allowed role
+    if (isCompanyBoss !== undefined && allowedRoles.includes(req.admin.role)) {
+        updateData.isCompanyBoss = isCompanyBoss;
+    }
+
     // Remove undefined fields to avoid overwriting existing data with null
-    Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+    // (Except isCompanyBoss which might intentionally be set to false)
+    Object.keys(updateData).forEach(key => {
+        if (key !== 'isCompanyBoss' && updateData[key] === undefined) {
+            delete updateData[key];
+        }
+    });
 
     // Find and update the user
     const updatedUser = await User.findByIdAndUpdate(
@@ -677,15 +698,16 @@ router.put('/clients/:clientId', async (req, res) => {
       return res.status(404).json({ message: 'Client not found.' });
     }
 
-    // Return updated user data (excluding password)
+    // Return updated user data (including the boss status)
     res.json({
         _id: updatedUser._id,
         email: updatedUser.email,
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         company: updatedUser.company,
-        address: updatedUser.address, // Ensure address is returned
-        role: updatedUser.role
+        address: updatedUser.address,
+        role: updatedUser.role, // Role is always 'client' now
+        isCompanyBoss: updatedUser.isCompanyBoss // Include the boss status
     });
 
   } catch (error) {
@@ -693,7 +715,6 @@ router.put('/clients/:clientId', async (req, res) => {
     if (error.name === 'ValidationError') {
         return res.status(400).json({ message: 'Validation Error', errors: error.errors });
     }
-    // Handle potential duplicate email error if email is unique
     if (error.code === 11000) {
         return res.status(400).json({ message: 'Email already in use.' });
     }

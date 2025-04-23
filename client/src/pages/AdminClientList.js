@@ -4,7 +4,10 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Paper, Button, IconButton, Tooltip,
   Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-  TextField
+  TextField,
+  MenuItem,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -33,7 +36,7 @@ function AdminClientList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [apiActionError, setApiActionError] = useState(null);
-  const { token } = useSelector((state) => state.auth);
+  const { token, user } = useSelector((state) => state.auth);
   const navigate = useNavigate();
 
   const [openFormDialog, setOpenFormDialog] = useState(false);
@@ -71,6 +74,8 @@ function AdminClientList() {
       lastName: '',
       email: '',
       company: '',
+      address: '',
+      isCompanyBoss: false,
       password: '',
       isEditing: false
     },
@@ -82,9 +87,14 @@ function AdminClientList() {
       const clientData = { ...values };
       delete clientData.isEditing;
 
+      if (isEditing) {
+        delete clientData.password;
+      } else {
+        delete clientData.isCompanyBoss;
+      }
+
       try {
         if (isEditing && selectedClient) {
-          delete clientData.password;
           await axios.put(`${API_URL}/admin/clients/${selectedClient._id}`, clientData, {
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -115,14 +125,20 @@ function AdminClientList() {
           lastName: client.lastName || '',
           email: client.email || '',
           company: client.company || '',
+          address: client.address || '',
+          isCompanyBoss: client.isCompanyBoss || false,
           password: '',
           isEditing: true
       });
     } else {
       setSelectedClient(null);
       setIsEditing(false);
-      formik.resetForm();
-      formik.setFieldValue('isEditing', false);
+      formik.resetForm({
+          values: {
+              firstName: '', lastName: '', email: '', company: '', address: '',
+              isCompanyBoss: false, password: '', isEditing: false
+          }
+      });
     }
     setOpenFormDialog(true);
   };
@@ -206,7 +222,7 @@ function AdminClientList() {
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {apiActionError && <Alert severity="error" sx={{ mb: 2 }}>{apiActionError}</Alert>}
+      {apiActionError && <Alert severity="error" sx={{ mb: 2, mt: 1 }}>{apiActionError}</Alert>}
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}>
@@ -215,14 +231,7 @@ function AdminClientList() {
       ) : (
         <TableContainer component={Paper} elevation={3}>
           <Table sx={{ minWidth: 650 }} aria-label="client list table">
-            <TableHead sx={{ backgroundColor: 'grey.100' }}> {/* Changed background to match TicketList */}
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Company</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'right' }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
+            <TableHead sx={{ backgroundColor: 'grey.100' }}><TableRow><TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Company</TableCell><TableCell sx={{ fontWeight: 'bold', textAlign: 'right' }}>Actions</TableCell></TableRow></TableHead>
             <TableBody>
               {clients.length > 0 ? (
                 clients.map((client) => (
@@ -268,7 +277,7 @@ function AdminClientList() {
           <DialogContent>
              {apiActionError && <Alert severity="error" sx={{ mb: 2 }}>{apiActionError}</Alert>}
              <TextField
-                autoFocus
+                autoFocus={!isEditing}
                 margin="dense"
                 id="firstName"
                 name="firstName"
@@ -331,6 +340,34 @@ function AdminClientList() {
                 value={formik.values.address || ''}
                 onChange={formik.handleChange}
              />
+             {/* --- Boss Status Switch --- */}
+             {isEditing && (
+                <Tooltip title={!formik.values.company ? "Cannot set as boss without a company name" : ( !['admin', 'technician'].includes(user?.role) ? "Only admins or technicians can change status" : "") }>
+                  {/* Wrap FormControlLabel in a span for Tooltip when disabled */}
+                  <span>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={formik.values.isCompanyBoss}
+                          onChange={(e) => formik.setFieldValue('isCompanyBoss', e.target.checked)}
+                          name="isCompanyBoss"
+                          color="primary"
+                          // Disable if not admin/tech OR if company field is empty
+                          disabled={!['admin', 'technician'].includes(user?.role) || !formik.values.company}
+                        />
+                      }
+                      label="Set as Company Boss"
+                      // Apply disabled style visually even if wrapped in span for tooltip
+                      sx={{ 
+                          mt: 1, 
+                          display: 'block',
+                          color: (!['admin', 'technician'].includes(user?.role) || !formik.values.company) ? 'text.disabled' : 'inherit' 
+                      }}
+                    />
+                  </span>
+                </Tooltip>
+             )}
+             {/* --- End Boss Status Switch --- */}
              {!isEditing && (
                  <TextField
                     margin="dense"
@@ -349,7 +386,7 @@ function AdminClientList() {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseFormDialog} disabled={formSubmitting}>Cancel</Button>
-            <Button type="submit" variant="contained" disabled={formSubmitting}>
+            <Button type="submit" variant="contained" disabled={formSubmitting || !formik.isValid}>
                 {formSubmitting ? <CircularProgress size={24} /> : (isEditing ? 'Save Changes' : 'Create Client')}
             </Button>
           </DialogActions>
