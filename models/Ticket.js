@@ -34,6 +34,10 @@ const ticketSchema = new mongoose.Schema({
     required: true,
     enum: ['hardware', 'software', 'network', 'security', 'other']
   },
+  suggestedDate: {
+    type: Date,
+    required: false
+  },
   progress: [{
     date: {
       type: Date,

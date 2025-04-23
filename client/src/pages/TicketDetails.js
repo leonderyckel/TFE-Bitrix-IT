@@ -50,7 +50,7 @@ function TicketDetails() {
 
   useEffect(() => {
     if (id) {
-      dispatch(fetchTicket(id));
+      dispatch(fetchTicket({ ticketId: id, isAdmin: false }));
     }
   }, [id, dispatch]);
 

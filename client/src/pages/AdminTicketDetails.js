@@ -344,6 +344,14 @@ function AdminTicketDetails() {
                     <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Category:</Typography></Grid>
                     <Grid item xs={7}><Chip label={ticket.category} size="small" /></Grid>
 
+                    {/* Display Suggested Date if available */}
+                    {ticket.suggestedDate && (
+                      <>
+                        <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Suggested Date:</Typography></Grid>
+                        <Grid item xs={7}><Typography variant="body2">{new Date(ticket.suggestedDate).toLocaleString()}</Typography></Grid>
+                      </>
+                    )}
+
                     <Grid item xs={5}><Typography variant="body2" color="text.secondary" fontWeight="bold">Client:</Typography></Grid>
                     <Grid item xs={7}><Typography variant="body2">{ticket.client?.firstName} {ticket.client?.lastName} ({ticket.client?.email})</Typography></Grid>
                     
