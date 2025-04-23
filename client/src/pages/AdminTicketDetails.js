@@ -45,6 +45,8 @@ function AdminTicketDetails() {
   // State for inline date/description editing
   const [scheduleDate, setScheduleDate] = useState(null);
 
+  const dispatch = useDispatch();
+
   // Définir toutes les étapes possibles de progression
   const allProgressSteps = [
     { value: 'logged', label: 'Logged', required: true },
@@ -83,7 +85,18 @@ function AdminTicketDetails() {
           }
         }
       );
+      
       setTicket(response.data);
+      
+      dispatch(fetchTicket({ ticketId: id, isAdmin: true })).then(action => {
+        if (fetchTicket.fulfilled.match(action)) {
+          setTicket(action.payload);
+        } else {
+          console.error("Failed to re-fetch ticket details after progress update:", action.payload);
+          setError("Progress updated, but failed to refresh details.");
+        }
+      });
+
       setScheduleDate(null);
 
     } catch (error) {

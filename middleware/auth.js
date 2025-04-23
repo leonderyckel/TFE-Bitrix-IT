@@ -13,48 +13,48 @@ const auth = async (req, res, next) => {
 
     try {
       // Verify token
+      console.log('[auth middleware] Verifying token with JWT_SECRET:', process.env.JWT_SECRET ? 'Exists' : 'MISSING!');
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       console.log('Token decoded:', decoded);
       
-      // Get models
       const { User, AdminUser } = getModels();
-      
       let user;
       
-      // Déterminer quelle base de données vérifier en premier
       if (decoded.isAdmin) {
-        // Si c'est un token admin, vérifier d'abord la base de données admin
-        user = await AdminUser.findById(decoded._id).select('-password');
+        // Find admin user using decoded.id
+        user = await AdminUser.findById(decoded.id).select('-password'); 
         console.log('User from admin database:', user ? 'Found' : 'Not found');
         
-        if (!user) {
-          user = await User.findById(decoded._id || decoded.id).select('-password');
-          console.log('User from public database:', user ? 'Found' : 'Not found');
-        }
+        // Fallback check (less likely for admin token but keep consistency)
+        // if (!user) {
+        //   user = await User.findById(decoded.id).select('-password');
+        //   console.log('User from public database (fallback):', user ? 'Found' : 'Not found');
+        // }
       } else {
-        // Si ce n'est pas un token admin, vérifier d'abord la base de données publique
-        user = await User.findById(decoded.id || decoded._id).select('-password');
+        // Find client user using decoded.id
+        user = await User.findById(decoded.id).select('-password');
         console.log('User from public database:', user ? 'Found' : 'Not found');
         
-        if (!user) {
-          user = await AdminUser.findById(decoded._id || decoded.id).select('-password');
-          console.log('User from admin database:', user ? 'Found' : 'Not found');
-        }
+        // Fallback check (less likely for client token but keep consistency)
+        // if (!user) {
+        //   user = await AdminUser.findById(decoded.id).select('-password');
+        //   console.log('User from admin database (fallback):', user ? 'Found' : 'Not found');
+        // }
       }
       
       if (!user) {
-        console.log('No user found in either database');
+        console.log('No user found in either database for id:', decoded.id);
         return res.status(401).json({ message: 'User not found' });
       }
 
-      console.log('User authenticated:', { id: user._id, role: user.role });
+      console.log('User authenticated:', { id: user._id, role: user.role, company: user.company, isBoss: user.isCompanyBoss });
       req.user = user;
       req.token = token;
       req.isAdmin = !!decoded.isAdmin;
       next();
     } catch (error) {
-      console.error('Token verification error:', error);
-      return res.status(401).json({ message: 'Token is not valid', error: error.message });
+      console.error('Token verification or User lookup error:', error);
+      return res.status(401).json({ message: 'Authentication failed', error: error.message });
     }
   } catch (error) {
     console.error('Auth middleware error:', error);

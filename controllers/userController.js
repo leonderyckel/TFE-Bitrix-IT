@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 
 // Generate JWT token
 const generateToken = (id, isAdmin = false) => {
+  console.log('[generateToken] Using JWT_SECRET:', process.env.JWT_SECRET ? 'Exists' : 'MISSING!'); // Log secret presence
   return jwt.sign({ id, isAdmin }, process.env.JWT_SECRET, {
     expiresIn: '30d'
   });
