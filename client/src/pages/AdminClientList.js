@@ -7,7 +7,11 @@ import {
   TextField,
   MenuItem,
   Switch,
-  FormControlLabel
+  FormControlLabel,
+  Grid,
+  Select,
+  InputLabel,
+  FormControl
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -33,6 +37,7 @@ const clientValidationSchema = yup.object({
 
 function AdminClientList() {
   const [clients, setClients] = useState([]);
+  const [filteredClients, setFilteredClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [apiActionError, setApiActionError] = useState(null);
@@ -45,6 +50,9 @@ function AdminClientList() {
   const [isEditing, setIsEditing] = useState(false);
   const [formSubmitting, setFormSubmitting] = useState(false);
 
+  const [nameSearch, setNameSearch] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
+
   const fetchClients = useCallback(async () => {
     try {
       setLoading(true);
@@ -54,6 +62,7 @@ function AdminClientList() {
         headers: { Authorization: `Bearer ${token}` },
       });
       setClients(response.data);
+      setFilteredClients(response.data);
     } catch (err) {
       console.error('Error fetching clients:', err);
       setError('Failed to load client list. ' + (err.response?.data?.message || err.message));
@@ -67,6 +76,33 @@ function AdminClientList() {
       fetchClients();
     }
   }, [token, fetchClients]);
+
+  useEffect(() => {
+    let result = clients;
+
+    if (companyFilter) {
+      result = result.filter(client => client.company === companyFilter);
+    }
+
+    if (nameSearch) {
+      const lowerCaseSearch = nameSearch.toLowerCase();
+      result = result.filter(client => 
+        client.firstName.toLowerCase().includes(lowerCaseSearch) ||
+        client.lastName.toLowerCase().includes(lowerCaseSearch)
+      );
+    }
+
+    setFilteredClients(result);
+
+  }, [clients, nameSearch, companyFilter]);
+
+  const companyOptions = [
+      { value: '', label: 'All Companies' },
+      ...[...new Set(clients.map(client => client.company))]
+        .filter(Boolean)
+        .sort()
+        .map(company => ({ value: company, label: company }))
+  ];
 
   const formik = useFormik({
     initialValues: {
@@ -221,6 +257,39 @@ function AdminClientList() {
           </Box>
       </Box>
 
+      {/* --- Filter/Search Controls --- */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+          <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} sm={6}>
+                  <TextField
+                      fullWidth
+                      label="Search by Name"
+                      variant="outlined"
+                      value={nameSearch}
+                      onChange={(e) => setNameSearch(e.target.value)}
+                      size="small"
+                  />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth size="small">
+                      <InputLabel>Filter by Company</InputLabel>
+                      <Select
+                          value={companyFilter}
+                          label="Filter by Company"
+                          onChange={(e) => setCompanyFilter(e.target.value)}
+                      >
+                          {companyOptions.map(option => (
+                              <MenuItem key={option.value} value={option.value}>
+                                  {option.label}
+                              </MenuItem>
+                          ))}
+                      </Select>
+                  </FormControl>
+              </Grid>
+          </Grid>
+      </Paper>
+      {/* --- End Filter/Search Controls --- */}
+
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {apiActionError && <Alert severity="error" sx={{ mb: 2, mt: 1 }}>{apiActionError}</Alert>}
 
@@ -233,8 +302,8 @@ function AdminClientList() {
           <Table sx={{ minWidth: 650 }} aria-label="client list table">
             <TableHead sx={{ backgroundColor: 'grey.100' }}><TableRow><TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Company</TableCell><TableCell sx={{ fontWeight: 'bold', textAlign: 'right' }}>Actions</TableCell></TableRow></TableHead>
             <TableBody>
-              {clients.length > 0 ? (
-                clients.map((client) => (
+              {filteredClients.length > 0 ? (
+                filteredClients.map((client) => (
                   <TableRow
                     key={client._id}
                     hover
@@ -262,7 +331,7 @@ function AdminClientList() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={4} align="center">
-                    No clients found.
+                    No clients found{ (nameSearch || companyFilter) ? ' matching your filters.' : '.'}
                   </TableCell>
                 </TableRow>
               )}
