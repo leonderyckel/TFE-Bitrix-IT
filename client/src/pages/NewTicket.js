@@ -180,6 +180,7 @@ const NewTicket = () => {
               <Grid item xs={12}>
                 <DateTimePicker
                   label="Suggested Appointment Time (Optional)"
+                  ampm={false}
                   value={suggestedDate}
                   onChange={(newValue) => {
                     setSuggestedDate(newValue);

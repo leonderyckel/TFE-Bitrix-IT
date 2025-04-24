@@ -151,6 +151,20 @@ const ticketSlice = createSlice({
       state.companyTickets = state.companyTickets.filter(ticket => ticket._id !== action.payload);
       state.loading = false;
       state.error = null;
+    },
+    updateTicketInList: (state, action) => {
+      const updatedTicket = action.payload;
+      const myIndex = state.myTickets.findIndex(t => t._id === updatedTicket._id);
+      if (myIndex !== -1) {
+        state.myTickets[myIndex] = updatedTicket;
+      }
+      const companyIndex = state.companyTickets.findIndex(t => t._id === updatedTicket._id);
+      if (companyIndex !== -1) {
+        state.companyTickets[companyIndex] = updatedTicket;
+      }
+      if (state.currentTicket && state.currentTicket._id === updatedTicket._id) {
+        state.currentTicket = updatedTicket;
+      }
     }
   },
   extraReducers: (builder) => {
@@ -272,7 +286,8 @@ export const {
   fetchTicketSuccess,
   createTicketSuccess,
   updateTicketSuccess,
-  deleteTicketSuccess
+  deleteTicketSuccess,
+  updateTicketInList
 } = ticketSlice.actions;
 
 export default ticketSlice.reducer; 

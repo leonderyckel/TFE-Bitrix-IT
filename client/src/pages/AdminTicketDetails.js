@@ -89,14 +89,24 @@ function AdminTicketDetails() {
       
       dispatch(fetchTicket({ ticketId: id, isAdmin: true })).then(action => {
         if (fetchTicket.fulfilled.match(action)) {
-          setTicket(action.payload);
+          const refreshedTicket = action.payload;
+          setTicket(refreshedTicket);
+
+          const scheduledStepDone = refreshedTicket.progress?.some(p => p.status === 'scheduled');
+          if (!scheduledStepDone && refreshedTicket.suggestedDate) {
+            const suggested = dayjs(refreshedTicket.suggestedDate);
+            if (suggested.isValid()) {
+              setScheduleDate(suggested);
+            }
+          } else {
+            setScheduleDate(null);
+          }
+
         } else {
           console.error("Failed to re-fetch ticket details after progress update:", action.payload);
           setError("Progress updated, but failed to refresh details.");
         }
       });
-
-      setScheduleDate(null);
 
     } catch (error) {
       console.error('Error adding progress update:', error);
@@ -415,6 +425,7 @@ function AdminTicketDetails() {
                             <>
                                <DateTimePicker
                                 label={`Select Date & Time`}
+                                ampm={false}
                                 value={scheduleDate}
                                 onChange={(newValue) => {
                                   setScheduleDate(newValue);

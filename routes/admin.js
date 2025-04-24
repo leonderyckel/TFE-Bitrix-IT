@@ -161,7 +161,25 @@ router.put('/tickets/:id', async (req, res) => {
     Object.assign(ticket, req.body);
     await ticket.save();
     
-    res.json(ticket);
+    // --- Emit WebSocket Event ---
+    const ticketId = req.params.id;
+    const updatedTicket = await Ticket.findById(ticketId)
+      .populate('client', 'firstName lastName email company isCompanyBoss')
+      .populate('comments.user', 'firstName lastName email') 
+      .populate({
+          path: 'technician',
+          select: 'firstName lastName email',
+          model: global.models.AdminUser
+       })
+      .lean();
+
+    if (updatedTicket) {
+      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+      console.log(`Emitted ticket:updated event to room ${ticketId} after PUT update`);
+    }
+    // --- End Emit WebSocket Event ---
+
+    res.json(updatedTicket || ticket);
   } catch (error) {
     console.error('Error updating ticket for admin:', error);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -172,20 +190,43 @@ router.put('/tickets/:id', async (req, res) => {
 router.post('/tickets/:id/comments', async (req, res) => {
   try {
     const { Ticket } = getModels();
-    const ticket = await Ticket.findById(req.params.id);
+    const ticketId = req.params.id;
+    let ticket = await Ticket.findById(ticketId);
     
     if (!ticket) {
       return res.status(404).json({ message: 'Ticket not found' });
     }
     
+    // Add the comment using admin ID
     ticket.comments.push({
-      user: req.admin._id,
+      user: req.admin._id, // Make sure this is correct field for admin comments
       content: req.body.content
     });
     
     await ticket.save();
+
+    // --- Emit WebSocket Event ---
+    // Fetch the updated ticket with necessary populated fields for the client view
+    const updatedTicket = await Ticket.findById(ticketId)
+      .populate('client', 'firstName lastName email company isCompanyBoss') // Populate client
+      .populate('comments.user', 'firstName lastName email') // Populate comment author
+      .populate({
+          path: 'technician',
+          select: 'firstName lastName email',
+          model: global.models.AdminUser // Assuming AdminUser model is needed
+       })
+      .lean(); // Use lean for plain JS object
+
+    if (updatedTicket) {
+      // Emit to the room named after the ticket ID
+      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+      console.log(`Emitted ticket:updated event to room ${ticketId}`);
+    }
+    // --- End Emit WebSocket Event ---
     
-    res.json(ticket);
+    // Send the updated ticket back in the HTTP response
+    res.json(updatedTicket || ticket); // Send updated if fetched, otherwise original save result
+
   } catch (error) {
     console.error('Error adding comment for admin:', error);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -283,14 +324,32 @@ router.post('/tickets/:id/progress', async (req, res) => {
     
     await ticket.save();
     
-    // Populate necessary fields before sending back
-    await ticket.populate([
-      { path: 'client', select: 'firstName lastName email company' },
-      { path: 'comments.user', select: 'firstName lastName email' }
-    ]);
+    // --- Emit WebSocket Event ---
+    const ticketId = req.params.id;
+    const updatedTicket = await Ticket.findById(ticketId)
+      .populate('client', 'firstName lastName email company isCompanyBoss')
+      .populate('comments.user', 'firstName lastName email') 
+      .populate({
+          path: 'technician',
+          select: 'firstName lastName email',
+          model: global.models.AdminUser
+       })
+      .lean();
+
+    if (updatedTicket) {
+      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+      console.log(`Emitted ticket:updated event to room ${ticketId} after progress update`);
+    }
+    // --- End Emit WebSocket Event ---
+
+    // Populate necessary fields before sending back (REMOVED - Already done above)
+    // await ticket.populate([
+    //   { path: 'client', select: 'firstName lastName email company' },
+    //   { path: 'comments.user', select: 'firstName lastName email' }
+    // ]);
 
     // Return the updated and populated ticket
-    res.json(ticket);
+    res.json(updatedTicket || ticket); // Send updated if fetched
   } catch (error) {
     console.error('Error adding progress update:', error);
     res.status(500).json({ message: 'Erreur serveur', error: error.message });
@@ -317,7 +376,25 @@ router.post('/tickets/:id/assign', async (req, res) => {
     ticket.status = 'in-progress';
     await ticket.save();
     
-    res.json(ticket);
+    // --- Emit WebSocket Event ---
+    const ticketId = req.params.id;
+    const updatedTicket = await Ticket.findById(ticketId)
+      .populate('client', 'firstName lastName email company isCompanyBoss')
+      .populate('comments.user', 'firstName lastName email') 
+      .populate({
+          path: 'technician',
+          select: 'firstName lastName email',
+          model: global.models.AdminUser
+       })
+      .lean();
+
+    if (updatedTicket) {
+      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+      console.log(`Emitted ticket:updated event to room ${ticketId} after assign`);
+    }
+    // --- End Emit WebSocket Event ---
+
+    res.json(updatedTicket || ticket);
   } catch (error) {
     console.error('Error assigning technician for admin:', error);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -357,7 +434,25 @@ router.post('/tickets/:id/cancel', async (req, res) => {
     });
     await ticket.save();
 
-    res.json(ticket);
+    // --- Emit WebSocket Event ---
+    const ticketId = req.params.id;
+    const updatedTicket = await Ticket.findById(ticketId)
+      .populate('client', 'firstName lastName email company isCompanyBoss')
+      .populate('comments.user', 'firstName lastName email') 
+      .populate({
+          path: 'technician',
+          select: 'firstName lastName email',
+          model: global.models.AdminUser
+       })
+      .lean();
+
+    if (updatedTicket) {
+      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+      console.log(`Emitted ticket:updated event to room ${ticketId} after cancel`);
+    }
+    // --- End Emit WebSocket Event ---
+
+    res.json(updatedTicket || ticket);
   } catch (error) {
     console.error('Error cancelling ticket:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -382,7 +477,25 @@ router.post('/tickets/:id/close', async (req, res) => {
     };
     await ticket.save();
     
-    res.json(ticket);
+    // --- Emit WebSocket Event ---
+    const ticketId = req.params.id;
+    const updatedTicket = await Ticket.findById(ticketId)
+      .populate('client', 'firstName lastName email company isCompanyBoss')
+      .populate('comments.user', 'firstName lastName email') 
+      .populate({
+          path: 'technician',
+          select: 'firstName lastName email',
+          model: global.models.AdminUser
+       })
+      .lean();
+
+    if (updatedTicket) {
+      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+      console.log(`Emitted ticket:updated event to room ${ticketId} after close`);
+    }
+    // --- End Emit WebSocket Event ---
+
+    res.json(updatedTicket || ticket);
   } catch (error) {
     console.error('Error closing ticket for admin:', error);
     res.status(500).json({ message: 'Erreur serveur' });

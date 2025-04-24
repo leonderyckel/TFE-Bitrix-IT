@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -23,7 +23,12 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import UpdateIcon from '@mui/icons-material/Update';
-import { fetchTickets } from '../store/slices/ticketSlice';
+import { fetchTickets, updateTicketInList } from '../store/slices/ticketSlice';
+import io from 'socket.io-client';
+import API_URL from '../config/api';
+
+// Socket instance (outside component)
+let socket;
 
 const TicketList = () => {
   const dispatch = useDispatch();
@@ -31,10 +36,79 @@ const TicketList = () => {
   const { myTickets, companyTickets, loading, error } = useSelector((state) => state.tickets);
   const { user } = useSelector((state) => state.auth);
   const theme = useTheme();
+  const socketRef = useRef();
+  const joinedRoomsRef = useRef(new Set()); // Keep track of joined rooms
 
   useEffect(() => {
+    // Initial fetch
     dispatch(fetchTickets());
-  }, [dispatch]);
+
+    // --- Socket.IO Connection ---
+    const serverBaseUrl = API_URL.substring(0, API_URL.indexOf('/api')) || API_URL;
+    socketRef.current = io(serverBaseUrl);
+    const socket = socketRef.current;
+
+    socket.on('connect', () => {
+      console.log('[TicketList] Socket connected:', socket.id);
+      // Initial room join logic will be handled by the next effect
+    });
+
+    socket.on('disconnect', () => {
+      console.log('[TicketList] Socket disconnected');
+      joinedRoomsRef.current.clear(); // Clear joined rooms on disconnect
+    });
+
+    // Listen for updates
+    socket.on('ticket:updated', (updatedTicket) => {
+      console.log('[TicketList] Received ticket:updated', updatedTicket);
+      // Dispatch action to update the ticket in the Redux store lists
+      dispatch(updateTicketInList(updatedTicket)); 
+    });
+
+    // Cleanup
+    return () => {
+      console.log('[TicketList] Disconnecting socket...');
+      socket.disconnect();
+      joinedRoomsRef.current.clear();
+    };
+    // Run only on mount/unmount
+  }, [dispatch]); 
+
+  // --- Effect to Manage Room Subscriptions based on tickets --- 
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return; // Ensure socket is connected
+
+    // Combine all visible ticket IDs
+    const currentTicketIds = new Set([
+      ...(myTickets || []).map(t => t._id),
+      ...(companyTickets || []).map(t => t._id)
+    ]);
+    const previouslyJoined = joinedRoomsRef.current;
+
+    // Leave rooms for tickets no longer visible
+    previouslyJoined.forEach(ticketId => {
+      if (!currentTicketIds.has(ticketId)) {
+        socket.emit('leaveTicketRoom', ticketId); // NOTE: Need backend handler for leaveTicketRoom
+        console.log(`[TicketList] Emitted leaveTicketRoom for ${ticketId}`);
+        previouslyJoined.delete(ticketId);
+      }
+    });
+
+    // Join rooms for new tickets
+    currentTicketIds.forEach(ticketId => {
+      if (!previouslyJoined.has(ticketId)) {
+        socket.emit('joinTicketRoom', ticketId);
+        console.log(`[TicketList] Emitted joinTicketRoom for ${ticketId}`);
+        previouslyJoined.add(ticketId);
+      }
+    });
+
+    // Update the ref with the current set
+    joinedRoomsRef.current = previouslyJoined; 
+
+  // Re-run whenever the ticket lists change
+  }, [myTickets, companyTickets]); 
 
   const getStatusColor = (status) => {
     switch (status) {

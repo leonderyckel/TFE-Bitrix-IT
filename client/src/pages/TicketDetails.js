@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
@@ -41,18 +41,63 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { StaticDatePicker } from '@mui/x-date-pickers/StaticDatePicker';
 import dayjs from 'dayjs';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+import { useTheme } from '@mui/material/styles';
+import io from 'socket.io-client';
+import API_URL from '../config/api';
+
+dayjs.extend(isSameOrBefore);
+
+// Socket connection instance (create outside component to avoid re-creation)
+let socket;
 
 function TicketDetails() {
-  const { id } = useParams();
+  const { id: ticketId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { currentTicket, loading, error } = useSelector((state) => state.tickets);
+  const theme = useTheme();
+  const [liveTicket, setLiveTicket] = useState(null);
+  const socketRef = useRef();
 
   useEffect(() => {
-    if (id) {
-      dispatch(fetchTicket({ ticketId: id, isAdmin: false }));
+    if (ticketId) {
+      dispatch(fetchTicket({ ticketId, isAdmin: false }));
     }
-  }, [id, dispatch]);
+
+    const serverBaseUrl = API_URL.substring(0, API_URL.indexOf('/api')) || API_URL;
+    
+    socketRef.current = io(serverBaseUrl, { 
+    });
+    const socket = socketRef.current;
+
+    socket.on('connect', () => {
+      console.log('Socket connected:', socket.id);
+      if (ticketId) {
+        socket.emit('joinTicketRoom', ticketId);
+        console.log('Emitted joinTicketRoom for:', ticketId);
+      }
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Socket disconnected');
+    });
+
+    socket.on('ticket:updated', (updatedTicket) => {
+      console.log('Received ticket:updated', updatedTicket);
+      if (updatedTicket._id === ticketId) {
+        setLiveTicket(updatedTicket);
+      }
+    });
+
+    return () => {
+      console.log('Disconnecting socket...');
+      socket.disconnect();
+    };
+    
+  }, [ticketId, dispatch]);
+
+  const displayTicketData = liveTicket || currentTicket;
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -105,13 +150,11 @@ function TicketDetails() {
     }
   };
 
-  // Fonction pour obtenir les étapes de progression terminées plus une étape "In Progress" si nécessaire
   const getCompletedSteps = (ticket) => {
     if (!ticket || !ticket.progress || !ticket.progress.length) {
       return ['Logged'];
     }
     
-    // Récupérer les étapes complétées (en ordre d'ajout)
     const completedSteps = ticket.progress.map(p => {
       const statusMap = {
         'logged': 'Logged',
@@ -124,33 +167,27 @@ function TicketDetails() {
       return statusMap[p.status] || p.status;
     });
     
-    // Ne pas ajouter "In Progress" si le ticket est fermé
     const isCompleted = ticket.status === 'closed';
     
-    // Ajouter "In Progress" uniquement si le ticket n'est pas completé
     return isCompleted ? completedSteps : [...completedSteps, 'In Progress'];
   };
 
-  // Fonction pour obtenir l'index de l'étape active
   const getActiveStepIndex = (ticket) => {
     if (!ticket || !ticket.progress || !ticket.progress.length) {
       return 0;
     }
     
-    // Si le ticket est terminé, l'étape active est la dernière étape
     if (ticket.status === 'resolved' || ticket.status === 'closed' || 
         (ticket.progress.length > 0 && ticket.progress[ticket.progress.length - 1].status === 'completed')) {
       return getCompletedSteps(ticket).length - 1;
     }
     
-    // Sinon, l'étape active est "In Progress" (dernière étape dans le tableau)
     return getCompletedSteps(ticket).length - 1;
   };
 
   const getStepDescription = (step, ticket) => {
     if (!ticket || !ticket.progress) return '';
     
-    // Trouver l'entrée de progression correspondante pour afficher sa description
     const progressEntry = ticket.progress.find(p => {
       const statusMap = {
         'logged': 'Logged',
@@ -166,7 +203,6 @@ function TicketDetails() {
     return progressEntry ? progressEntry.description : '';
   };
 
-  // Map status values to more readable labels for the history list
   const progressStatusLabels = {
     'logged': 'Logged',
     'assigned': 'Assigned',
@@ -176,28 +212,45 @@ function TicketDetails() {
     'closed': 'Closed'
   };
 
-  // Keep the Stepper logic for the top visual progress bar
-  const completedSteps = getCompletedSteps(currentTicket);
-  const activeStep = getActiveStepIndex(currentTicket);
+  const completedSteps = getCompletedSteps(displayTicketData);
+  const activeStep = getActiveStepIndex(displayTicketData);
 
-  // --- Add logic to find the latest scheduled date ---
-  let latestScheduledDate = null;
-  if (currentTicket && currentTicket.progress) {
-    // Iterate backwards to find the most recent relevant entry
-    for (let i = currentTicket.progress.length - 1; i >= 0; i--) {
-      const progress = currentTicket.progress[i];
-      if (['scheduled', 'rescheduled'].includes(progress.status) && progress.scheduledDate) {
-        const date = dayjs(progress.scheduledDate);
-        if (date.isValid()) { // Check if the date is valid
-          latestScheduledDate = date;
-          break; // Found the latest one
+  let displayLabel = "Not Planned Yet";
+  let displayDate = null;
+  let displayCalendar = false;
+  let displayColor = 'text.secondary';
+
+  if (displayTicketData) {
+    const scheduledProgressEntry = displayTicketData.progress?.find(p => p.status === 'scheduled');
+    const suggestedDateObj = displayTicketData.suggestedDate ? dayjs(displayTicketData.suggestedDate) : null;
+
+    if (scheduledProgressEntry && scheduledProgressEntry.scheduledDate) {
+      const confirmedDateObj = dayjs(scheduledProgressEntry.scheduledDate);
+      if (confirmedDateObj.isValid()) {
+        displayDate = confirmedDateObj;
+        displayCalendar = true;
+        if (suggestedDateObj && suggestedDateObj.isValid()) {
+          if (confirmedDateObj.startOf('minute').isSame(suggestedDateObj.startOf('minute'))) {
+            displayLabel = "Confirmed";
+            displayColor = 'success.main';
+          } else {
+            displayLabel = "Technician Changed Schedule";
+            displayColor = 'info.main';
+          }
+        } else {
+          displayLabel = "Scheduled";
+          displayColor = 'text.primary';
         }
       }
-    }
+    } else if (suggestedDateObj && suggestedDateObj.isValid()) {
+      displayLabel = "Not Confirmed";
+      displayDate = suggestedDateObj;
+      displayCalendar = true;
+      displayColor = 'warning.main';
+    } 
   }
-  // --- End logic ---
 
-  if (loading) {
+  if (loading && !displayTicketData) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4, display: 'flex', justifyContent: 'center' }}>
         <CircularProgress />
@@ -205,7 +258,7 @@ function TicketDetails() {
     );
   }
 
-  if (error) {
+  if (error && !displayTicketData) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
@@ -225,7 +278,7 @@ function TicketDetails() {
     );
   }
 
-  if (!currentTicket) {
+  if (!displayTicketData) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
@@ -248,23 +301,21 @@ function TicketDetails() {
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        {/* Header matching TicketList style */}
         <Box sx={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center', 
           mb: 3,
-          bgcolor: 'primary.main', // Use primary blue color
-          borderRadius: '8px', // Match TicketList explicit border radius
-          color: 'primary.contrastText', // Set text color to white
-          p: 2 // Match TicketList padding
+          bgcolor: 'primary.main',
+          borderRadius: '8px',
+          color: 'primary.contrastText',
+          p: 2
         }}>
           <Box>
             <Typography variant="h5" component="h1" sx={{ mb: 0, color: 'inherit', fontWeight: 'bold' }}>
-              Ticket Details: {currentTicket.title}
+              Ticket Details: {displayTicketData.title}
             </Typography>
           </Box>
-          {/* Keep the existing outlined button style for now */}
           <Button 
             variant="outlined" 
             size="small" 
@@ -283,53 +334,46 @@ function TicketDetails() {
         </Box>
 
         <Grid container spacing={3}>
-          {/* Combined Info / Description / Schedule Card */}
           <Grid item xs={12} md={6}> 
             <Paper sx={{ p: 3 }}>
-              {/* 1. Ticket Info Section (Moved to top) */}
               <Grid container spacing={2} sx={{ mb: 2 }}>
-                {/* Created Date */}
                 <Grid item xs={12} sm={6}>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <ListItemIcon sx={{ minWidth: 36 }}><AccessTimeIcon color="primary" /></ListItemIcon>
                     <Typography variant="body2" color="text.secondary">
-                      Created: {new Date(currentTicket.createdAt).toLocaleString()}
+                      Created: {new Date(displayTicketData.createdAt).toLocaleString()}
                     </Typography>
                   </Box>
                 </Grid>
-                {/* Technician */}
                 <Grid item xs={12} sm={6}>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <ListItemIcon sx={{ minWidth: 36 }}><PersonIcon color="primary" /></ListItemIcon>
                     <Typography variant="body2" color="text.secondary">
-                      Technician: {currentTicket.technician ? `${currentTicket.technician.firstName} ${currentTicket.technician.lastName}` : 'Not assigned'}
+                      Technician: {displayTicketData.technician ? `${displayTicketData.technician.firstName} ${displayTicketData.technician.lastName}` : 'Not assigned'}
                     </Typography>
                   </Box>
                 </Grid>
-                 {/* Category */}
                 <Grid item xs={12} sm={6}>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <ListItemIcon sx={{ minWidth: 36 }}><CategoryIcon color="primary" /></ListItemIcon>
                     <Typography variant="body2" color="text.secondary">
-                      Category: <Chip label={currentTicket.category} size="small" />
+                      Category: <Chip label={displayTicketData.category} size="small" />
                     </Typography>
                   </Box>
                 </Grid>
-                 {/* Priority */} 
                 <Grid item xs={12} sm={6}>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <ListItemIcon sx={{ minWidth: 36 }}><FlagIcon color="primary" /></ListItemIcon>
                     <Typography variant="body2" color="text.secondary">
-                      Priority: <Chip label={currentTicket.priority} color={getPriorityColor(currentTicket.priority)} size="small" />
+                      Priority: <Chip label={displayTicketData.priority} color={getPriorityColor(displayTicketData.priority)} size="small" />
                     </Typography>
                   </Box>
                 </Grid>
-                 {/* Status */}
                 <Grid item xs={12}>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <ListItemIcon sx={{ minWidth: 36 }}><InfoIcon color="primary" /></ListItemIcon>
                     <Typography variant="body2" color="text.secondary">
-                      Status: <Chip label={currentTicket.status} color={getStatusColor(currentTicket.status)} size="small" />
+                      Status: <Chip label={displayTicketData.status} color={getStatusColor(displayTicketData.status)} size="small" />
                     </Typography>
                   </Box>
                 </Grid>
@@ -337,26 +381,25 @@ function TicketDetails() {
 
               <Divider sx={{ my: 2 }} />
 
-              {/* 2. Description Section */}
               <Typography variant="subtitle1" gutterBottom>
                 Description
               </Typography>
               <Typography variant="body2" paragraph sx={{ whiteSpace: 'pre-wrap' }}>
-                {currentTicket.description}
+                {displayTicketData.description}
               </Typography>
               
               <Divider sx={{ my: 2 }} />
 
-              {/* 3. Scheduled Date Section (Moved here) */}
-              <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
-                Scheduled Date
+              <Typography variant="subtitle1" gutterBottom sx={{ mt: 2, color: displayColor, fontWeight: 'medium' }}>
+                {displayLabel}
               </Typography>
-              {latestScheduledDate ? (
+
+              {displayCalendar && displayDate ? (
                 <Box sx={{ mt: 1 }}>
                   <StaticDatePicker
                     displayStaticWrapperAs="desktop"
                     readOnly
-                    value={latestScheduledDate}
+                    value={displayDate}
                     renderInput={(params) => <TextField {...params} sx={{ display: 'none' }} />}
                     sx={{
                       '& .MuiPickerStaticWrapper-root': { minWidth: 'auto' },
@@ -364,66 +407,56 @@ function TicketDetails() {
                       bgcolor: 'transparent'
                     }}
                   />
-                  {/* Enhanced Time Display */}
                   <Box sx={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    mt: 2,
-                    gap: 1
+                    mt: 0.5,
+                    gap: 0.5 
                   }}>
-                    <AccessTimeIcon color="action" />
+                    <AccessTimeIcon color="action" fontSize="small" />
                     <Typography variant="subtitle1">
-                      {latestScheduledDate.format('HH:mm')}
+                      {displayDate.format('HH:mm')}
                     </Typography>
                   </Box>
                 </Box>
               ) : (
                 <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-                  Not planned yet
+                   {displayLabel === 'Not Planned Yet' ? displayLabel : ''} 
                 </Typography>
               )}
             </Paper>
           </Grid>
 
-          {/* Ticket Progress Tracking Card (Remains on the right) */}
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 3, display: 'flex', flexDirection: 'column' }}>
               <Typography variant="h6" gutterBottom>
                 Ticket Progress Tracking
               </Typography>
-              {/* Restore specific styling for the Stepper */}
               <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 3 }}>
                 {completedSteps.map((label, index) => {
                   const isActive = index === activeStep;
-                  const isInProgress = isActive && label === 'In Progress'; // Check if it's the active In Progress step
+                  const isInProgress = isActive && label === 'In Progress';
 
                   return (
                     <Step key={label} completed={index < activeStep}>
                       <StepLabel
                         StepIconProps={{
                           sx: {
-                            // Style the icon container for the active 'In Progress' step
                             '&.Mui-active': {
                               color: isInProgress ? 'warning.main' : undefined, 
-                              // Hide the text number inside the active 'In Progress' icon
                               '& .MuiStepIcon-text': { 
                                 fill: isInProgress ? 'transparent' : undefined, 
                               }
                             },
-                            // Completed icons remain default (primary)
-                            // Inactive icons remain default
                           },
                         }}
                         sx={{
-                          // Style the label text for the active 'In Progress' step
                           '& .MuiStepLabel-label': {
                             '&.Mui-active': {
                               color: isInProgress ? 'warning.main' : undefined,
                               fontWeight: isInProgress ? 'medium' : undefined,
                             },
-                            // Completed labels remain default
-                            // Inactive labels remain default
                           },
                         }}
                       >
@@ -435,20 +468,19 @@ function TicketDetails() {
               </Stepper>
               <Divider sx={{ my: 2 }} />
 
-              {/* Progress History List (like admin view) */}
               <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <HistoryIcon fontSize="small" />
                 Progress History
               </Typography>
-              {currentTicket.progress && currentTicket.progress.length > 0 ? (
+              {displayTicketData.progress && displayTicketData.progress.length > 0 ? (
                 <List dense sx={{ 
                   overflow: 'auto', 
                   bgcolor: 'background.paper', 
                   p: 0, 
-                  flexGrow: 1 // Allow list to take remaining vertical space
+                  flexGrow: 1
                 }}>
-                  {currentTicket.progress.map((progress, index) => (
-                    <ListItem key={index} divider={index < currentTicket.progress.length - 1}>
+                  {displayTicketData.progress.map((progress, index) => (
+                    <ListItem key={index} divider={index < displayTicketData.progress.length - 1}>
                        <ListItemAvatar sx={{ minWidth: 40}}>
                          <Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.light', fontSize: '0.8rem' }}>
                            {index + 1}
@@ -480,7 +512,6 @@ function TicketDetails() {
             </Paper>
           </Grid>
 
-          {/* Updates and Comments Card (Remains full width below) */}
           <Grid item xs={12}>
             <Paper sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -490,9 +521,9 @@ function TicketDetails() {
               <Divider sx={{ my: 2 }} />
               
               <List>
-                {currentTicket.comments && currentTicket.comments.length > 0 ? (
-                  currentTicket.comments.map((comment, index) => (
-                    <ListItem key={index} alignItems="flex-start" divider={index < currentTicket.comments.length - 1}>
+                {displayTicketData.comments && displayTicketData.comments.length > 0 ? (
+                  displayTicketData.comments.map((comment, index) => (
+                    <ListItem key={index} alignItems="flex-start" divider={index < displayTicketData.comments.length - 1}>
                       <ListItemText
                         primary={
                           <Typography variant="subtitle2">
