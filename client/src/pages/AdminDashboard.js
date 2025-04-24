@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Box, Typography, Container, Grid, Paper, Button, 
   Table, TableBody, TableCell, TableContainer, TableHead, 
@@ -17,6 +17,10 @@ import WarningIcon from '@mui/icons-material/Warning';
 import PriorityHighIcon from '@mui/icons-material/PriorityHigh';
 import CancelIcon from '@mui/icons-material/Cancel';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import io from 'socket.io-client';
+
+// Socket instance
+let socket;
 
 function AdminDashboard() {
   const { user, token } = useSelector((state) => state.auth);
@@ -28,24 +32,28 @@ function AdminDashboard() {
   const [technicians, setTechnicians] = useState([]);
   const [selectedTechnicianFilter, setSelectedTechnicianFilter] = useState('all');
   const navigate = useNavigate();
+  const socketRef = useRef();
+
+  // Wrap fetchTickets in useCallback to avoid recreating it on every render
+  const fetchTickets = useCallback(async () => {
+    try {
+      // Don't set loading to true here if we are just refreshing
+      // setLoading(true); 
+      const response = await axios.get(`${API_URL}/admin/tickets`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      setTickets(response.data);
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+    } finally {
+      // Ensure loading is set to false after fetch, even if it was just a refresh
+      setLoading(false);
+    }
+  }, [token]); // Dependency: token
 
   useEffect(() => {
-    const fetchTickets = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get(`${API_URL}/admin/tickets`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-        setTickets(response.data);
-      } catch (error) {
-        console.error('Error fetching tickets:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     const fetchTechnicians = async () => {
       try {
         const response = await axios.get(`${API_URL}/admin/admins`, {
@@ -60,9 +68,52 @@ function AdminDashboard() {
       }
     };
 
-    fetchTickets();
+    setLoading(true); // Set loading true for initial fetch
+    fetchTickets(); // Initial fetch
     fetchTechnicians();
-  }, [token]);
+
+    // --- Socket.IO Setup ---
+    const serverBaseUrl = API_URL.substring(0, API_URL.indexOf('/api')) || API_URL;
+    socketRef.current = io(serverBaseUrl);
+    const socket = socketRef.current;
+
+    socket.on('connect', () => {
+      console.log('[AdminDashboard] Socket connected:', socket.id);
+      // Join the admin room
+      socket.emit('joinAdminRoom');
+      console.log('[AdminDashboard] Emitted joinAdminRoom');
+    });
+
+    socket.on('disconnect', () => {
+      console.log('[AdminDashboard] Socket disconnected');
+    });
+
+    // Listen for new tickets
+    socket.on('admin:newTicket', ({ ticketId }) => {
+      console.log('[AdminDashboard] Received admin:newTicket', ticketId);
+      // Re-fetch the entire list when a new ticket is created
+      // Could potentially just add the new ticket to the state for optimization
+      fetchTickets(); 
+    });
+
+    // Listen for updates to existing tickets (status, comments, technician etc.)
+    socket.on('ticket:updated', (updatedTicket) => {
+      console.log('[AdminDashboard] Received ticket:updated', updatedTicket);
+      setTickets(prevTickets => 
+        prevTickets.map(ticket => 
+          ticket._id === updatedTicket._id ? updatedTicket : ticket
+        )
+      );
+    });
+
+    // Cleanup
+    return () => {
+      console.log('[AdminDashboard] Disconnecting socket...');
+      socket.emit('leaveAdminRoom');
+      socket.disconnect();
+    };
+
+  }, [fetchTickets, token]); // Include fetchTickets and token
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);

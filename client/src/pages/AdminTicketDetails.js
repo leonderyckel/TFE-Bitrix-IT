@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Box, Typography, Container, Paper, Grid, Chip, 
   Divider, TextField, Button, List, ListItem, 
@@ -22,9 +22,15 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import dayjs from 'dayjs';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+import io from 'socket.io-client';
+import { useTheme } from '@mui/material/styles';
+
+// Socket instance
+let socket;
 
 function AdminTicketDetails() {
-  const { id } = useParams();
+  const { id: ticketId } = useParams();
   const { token } = useSelector((state) => state.auth);
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +52,8 @@ function AdminTicketDetails() {
   const [scheduleDate, setScheduleDate] = useState(null);
 
   const dispatch = useDispatch();
+  const theme = useTheme();
+  const socketRef = useRef();
 
   // Définir toutes les étapes possibles de progression
   const allProgressSteps = [
@@ -76,7 +84,7 @@ function AdminTicketDetails() {
       }
 
       const response = await axios.post(
-        `${API_URL}/admin/tickets/${id}/progress`,
+        `${API_URL}/admin/tickets/${ticketId}/progress`,
         payload,
         {
           headers: {
@@ -87,7 +95,7 @@ function AdminTicketDetails() {
       
       setTicket(response.data);
       
-      dispatch(fetchTicket({ ticketId: id, isAdmin: true })).then(action => {
+      dispatch(fetchTicket({ ticketId: ticketId, isAdmin: true })).then(action => {
         if (fetchTicket.fulfilled.match(action)) {
           const refreshedTicket = action.payload;
           setTicket(refreshedTicket);
@@ -126,7 +134,7 @@ function AdminTicketDetails() {
     const loadTicketData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${API_URL}/admin/tickets/${id}`, {
+        const response = await axios.get(`${API_URL}/admin/tickets/${ticketId}`, {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -157,6 +165,56 @@ function AdminTicketDetails() {
         if (fetchedTicket.technician) {
           setSelectedTechnician(fetchedTicket.technician._id);
         }
+
+        // --- Establish Socket Connection AFTER initial load ---
+        if (!socketRef.current) { // Connect only once
+            const serverBaseUrl = API_URL.substring(0, API_URL.indexOf('/api')) || API_URL;
+            socketRef.current = io(serverBaseUrl);
+            const socket = socketRef.current;
+
+            socket.on('connect', () => {
+                console.log('[AdminTicketDetails] Socket connected:', socket.id);
+                if (ticketId) {
+                    socket.emit('joinTicketRoom', ticketId);
+                    console.log('[AdminTicketDetails] Emitted joinTicketRoom for:', ticketId);
+                }
+            });
+
+            socket.on('disconnect', () => {
+                console.log('[AdminTicketDetails] Socket disconnected');
+            });
+
+            // Listen for updates specific to THIS ticket
+            socket.on('ticket:updated', (updatedTicket) => {
+                console.log('[AdminTicketDetails] Received ticket:updated', updatedTicket);
+                if (updatedTicket._id === ticketId) {
+                    // Update the main ticket state directly
+                    setTicket(updatedTicket); 
+                    // Re-apply suggested date logic if necessary
+                    const scheduledStepDone = updatedTicket.progress?.some(p => p.status === 'scheduled');
+                    if (!scheduledStepDone && updatedTicket.suggestedDate) {
+                        const suggested = dayjs(updatedTicket.suggestedDate);
+                        if (suggested.isValid()) {
+                            setScheduleDate(suggested);
+                        }
+                    } else {
+                         // Maybe only clear if the update WAS NOT a schedule action itself?
+                         // For now, let's keep the logic simple: potentially clear if suggestion gone or step done
+                         if (!updatedTicket.suggestedDate || scheduledStepDone) {
+                             setScheduleDate(null);
+                         }
+                    }
+                    // Update assigned technician dropdown if needed
+                    if (updatedTicket.technician?._id) {
+                      setSelectedTechnician(updatedTicket.technician._id);
+                    } else {
+                      setSelectedTechnician('');
+                    }
+                }
+            });
+        }
+        // --- End Socket Setup ---
+
       } catch (error) {
         console.error('Error fetching ticket:', error);
         setError('Failed to load ticket. ' + (error.response?.data?.message || error.message));
@@ -166,7 +224,18 @@ function AdminTicketDetails() {
     };
 
     loadTicketData();
-  }, [id, token]);
+
+    // --- Cleanup on component unmount ---
+    return () => {
+      if (socketRef.current) {
+        console.log('[AdminTicketDetails] Disconnecting socket...');
+        // No need to explicitly leave room if connection disconnects
+        socketRef.current.disconnect();
+        socketRef.current = null; // Clear the ref
+      }
+    };
+
+  }, [ticketId, token, dispatch]);
 
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
@@ -175,7 +244,7 @@ function AdminTicketDetails() {
     try {
       setSubmitting(true);
       const response = await axios.post(
-        `${API_URL}/admin/tickets/${id}/comments`,
+        `${API_URL}/admin/tickets/${ticketId}/comments`,
         { content: comment },
         {
           headers: {
@@ -197,7 +266,7 @@ function AdminTicketDetails() {
     try {
       setSubmitting(true);
       const response = await axios.post(
-        `${API_URL}/admin/tickets/${id}/close`,
+        `${API_URL}/admin/tickets/${ticketId}/close`,
         { resolutionDescription: resolution },
         {
           headers: {
@@ -223,7 +292,7 @@ function AdminTicketDetails() {
       setCancelling(true);
       setError(null);
       const response = await axios.post(
-        `${API_URL}/admin/tickets/${id}/cancel`,
+        `${API_URL}/admin/tickets/${ticketId}/cancel`,
         { reason: cancellationReason },
         {
           headers: {

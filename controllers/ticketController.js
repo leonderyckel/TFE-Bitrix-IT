@@ -19,6 +19,15 @@ exports.createTicket = async (req, res) => {
     
     const ticket = await Ticket.create(ticketData);
 
+    // --- Emit WebSocket Event to Admins ---
+    if (req.io) { // Check if io is available (it should be)
+      req.io.to('adminRoom').emit('admin:newTicket', { ticketId: ticket._id });
+      console.log(`Emitted admin:newTicket event to adminRoom for ticket ${ticket._id}`);
+    } else {
+      console.error('req.io not found in createTicket');
+    }
+    // --- End Emit ---
+
     res.status(201).json(ticket);
   } catch (error) {
     console.error('Error creating ticket:', error);
@@ -204,7 +213,30 @@ exports.addComment = async (req, res) => {
 
     await ticket.save();
 
-    res.json(ticket);
+    // --- Emit WebSocket Event ---
+    const ticketId = req.params.id;
+    // Fetch the updated ticket with necessary populated fields 
+    // Note: Ensure populations match what both client/admin details pages expect
+    const updatedTicket = await Ticket.findById(ticketId)
+      .populate('client', 'firstName lastName email company isCompanyBoss') 
+      .populate('comments.user', 'firstName lastName email') 
+      .populate({
+          path: 'technician',
+          select: 'firstName lastName email',
+          model: global.models.AdminUser // Assuming AdminUser model is needed and available
+       })
+      .lean();
+
+    if (updatedTicket && req.io) {
+      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+      console.log(`Emitted ticket:updated event to room ${ticketId} after client comment`);
+    } else if (!req.io) {
+       console.error('req.io not found in client addComment');
+    }
+    // --- End Emit WebSocket Event ---
+
+    res.json(updatedTicket || ticket); // Send back populated ticket
+
   } catch (error) {
     console.error('Error adding comment:', error);
     res.status(500).json({ message: 'Error adding comment', error: error.message });

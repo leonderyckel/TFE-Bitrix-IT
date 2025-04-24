@@ -59,6 +59,9 @@ function TicketDetails() {
   const theme = useTheme();
   const [liveTicket, setLiveTicket] = useState(null);
   const socketRef = useRef();
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [commentError, setCommentError] = useState(null);
 
   useEffect(() => {
     if (ticketId) {
@@ -249,6 +252,23 @@ function TicketDetails() {
       displayColor = 'warning.main';
     } 
   }
+
+  const handleCommentSubmit = async (e) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+
+    setSubmittingComment(true);
+    setCommentError(null);
+
+    try {
+      await dispatch(addComment({ ticketId, comment: newComment })).unwrap();
+      setNewComment('');
+    } catch (error) {
+      setCommentError(error.message || 'Failed to add comment');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
 
   if (loading && !displayTicketData) {
     return (
@@ -520,7 +540,7 @@ function TicketDetails() {
               </Typography>
               <Divider sx={{ my: 2 }} />
               
-              <List>
+              <List sx={{ maxHeight: 300, overflow: 'auto', mb: 2, p: 0 }}>
                 {displayTicketData.comments && displayTicketData.comments.length > 0 ? (
                   displayTicketData.comments.map((comment, index) => (
                     <ListItem key={index} alignItems="flex-start" divider={index < displayTicketData.comments.length - 1}>
@@ -546,6 +566,35 @@ function TicketDetails() {
                   </ListItem>
                 )}
               </List>
+
+              {displayTicketData && !['closed', 'cancelled'].includes(displayTicketData.status) ? (
+                <Box component="form" onSubmit={handleCommentSubmit} sx={{ mt: 2 }}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={3}
+                    label="Add your comment"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    variant="outlined"
+                    size="small"
+                  />
+                  <Button 
+                    type="submit" 
+                    variant="contained" 
+                    disabled={submittingComment || !newComment.trim()}
+                    sx={{ mt: 1 }}
+                    size="small"
+                  >
+                    {submittingComment ? <CircularProgress size={20} /> : 'Add Comment'}
+                  </Button>
+                   {commentError && <Typography color="error" variant="caption" sx={{ display: 'block', mt: 1 }}>{commentError}</Typography>}
+                </Box>
+              ) : (
+                <Typography sx={{ mt: 2 }} color="text.secondary" variant="body2">
+                  Cannot add comments to a {displayTicketData?.status} ticket.
+                </Typography>
+              )}
             </Paper>
           </Grid>
         </Grid>

@@ -27,14 +27,36 @@ const io = new Server(server, {
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
 
-  // Example: Joining a room based on ticket ID (we'll implement this later)
+  // === Ticket-Specific Room Logic ===
+  // Listen for clients/admins wanting to join a ticket-specific room
   socket.on('joinTicketRoom', (ticketId) => {
-    socket.join(ticketId); // Join a room named after the ticket ID
-    console.log(`Socket ${socket.id} joined room ${ticketId}`);
+    socket.join(ticketId); 
+    console.log(`Socket ${socket.id} joined ticket room ${ticketId}`);
   });
+
+  // Listen for clients/admins wanting to leave a ticket-specific room
+  socket.on('leaveTicketRoom', (ticketId) => {
+    socket.leave(ticketId); 
+    console.log(`Socket ${socket.id} left ticket room ${ticketId}`);
+  });
+
+  // === Admin-Specific Room Logic ===
+  // Listen for admins wanting to join the general admin room
+  socket.on('joinAdminRoom', () => {
+    socket.join('adminRoom');
+    console.log(`Socket ${socket.id} joined adminRoom`);
+  });
+
+  // Listen for admins wanting to leave the general admin room
+  socket.on('leaveAdminRoom', () => {
+    socket.leave('adminRoom');
+    console.log(`Socket ${socket.id} left adminRoom`);
+  });
+  // ==================================
 
   socket.on('disconnect', () => {
     console.log(`Socket disconnected: ${socket.id}`);
+    // Note: socket.io automatically handles leaving rooms on disconnect
   });
 });
 // --- End Socket.io Setup ---
