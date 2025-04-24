@@ -46,9 +46,12 @@ exports.getTickets = async (req, res) => {
       const companyUserIds = companyUsers.map(u => u._id);
       console.log(`Found ${companyUserIds.length} users in the company.`);
 
-      // 2. Find all tickets for these users
-      const allCompanyTickets = await Ticket.find({ client: { $in: companyUserIds } })
-        .populate('client', 'firstName lastName email company isCompanyBoss') // Populate needed client fields
+      // 2. Find all NON-CANCELLED tickets for these users
+      const allCompanyTickets = await Ticket.find({ 
+        client: { $in: companyUserIds },
+        status: { $ne: 'cancelled' } // <-- Exclude cancelled
+      })
+        .populate('client', 'firstName lastName email company isCompanyBoss')
         .sort('-createdAt');
       console.log(`Found ${allCompanyTickets.length} total tickets for the company.`);
 
@@ -60,7 +63,10 @@ exports.getTickets = async (req, res) => {
     } else {
       // --- Regular Client Logic --- 
       console.log(`User ${userId} is not a boss or has no company. Fetching only own tickets.`);
-      myTickets = await Ticket.find({ client: userId })
+      myTickets = await Ticket.find({ 
+        client: userId, 
+        status: { $ne: 'cancelled' } // <-- Exclude cancelled
+       })
         .populate('client', 'firstName lastName email company isCompanyBoss')
         .sort('-createdAt');
       companyTickets = []; // Ensure companyTickets is an empty array
@@ -88,6 +94,13 @@ exports.getTicket = async (req, res) => {
     if (!ticket) {
       return res.status(404).json({ message: 'Ticket not found' });
     }
+
+    // --- Add check for cancelled status ---
+    if (ticket.status === 'cancelled') {
+      console.log(`Attempt to access cancelled ticket ${ticket._id} by user ${req.user.id}`);
+      return res.status(404).json({ message: 'Ticket not found or has been cancelled.' }); 
+    }
+    // --- End check ---
 
     // --- Access Control Logic --- 
     const loggedInUser = req.user;
