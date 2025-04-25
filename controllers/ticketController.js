@@ -213,29 +213,87 @@ exports.addComment = async (req, res) => {
 
     await ticket.save();
 
-    // --- Emit WebSocket Event ---
+    // --- Emit WebSocket Event & Create Notification --- 
     const ticketId = req.params.id;
-    // Fetch the updated ticket with necessary populated fields 
-    // Note: Ensure populations match what both client/admin details pages expect
-    const updatedTicket = await Ticket.findById(ticketId)
-      .populate('client', 'firstName lastName email company isCompanyBoss') 
-      .populate('comments.user', 'firstName lastName email') 
-      .populate({
-          path: 'technician',
-          select: 'firstName lastName email',
-          model: global.models.AdminUser // Assuming AdminUser model is needed and available
-       })
-      .lean();
+    const { Notification, AdminUser } = getModels(); // Get Notification model
 
-    if (updatedTicket && req.io) {
-      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
-      console.log(`Emitted ticket:updated event to room ${ticketId} after client comment`);
-    } else if (!req.io) {
-       console.error('req.io not found in client addComment');
+    try {
+      // Fetch updated ticket with populated fields needed for notification logic
+      const updatedTicket = await Ticket.findById(ticketId)
+        .populate('client', '_id firstName lastName') // Need client ID
+        .populate('technician', '_id firstName lastName') // Need technician ID (from AdminUser model)
+        .lean(); // Use lean for plain JS object
+
+      if (!updatedTicket) {
+        throw new Error('Ticket not found after saving comment');
+      }
+
+      // Emit WebSocket event first (don't block response for DB write)
+      if (req.io) {
+        req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+        console.log(`Emitted ticket:updated event to room ${ticketId} after comment`);
+      } else {
+        console.error('req.io not found in addComment');
+      }
+
+      // Prepare notification details
+      const commenterName = req.user.firstName || 'Utilisateur'; // Use req.user from auth middleware
+      const notificationText = `Nouveau commentaire de ${commenterName} sur le ticket #${ticketId.substring(0, 8)} (${updatedTicket.title || 'sans titre'})`;
+      const notificationLink = `/tickets/${ticketId}`; // Link for client
+      const adminNotificationLink = `/admin/tickets/${ticketId}`; // Link for admin/tech
+
+      let notificationsToCreate = [];
+
+      // Determine who to notify
+      const commenterId = req.user.id.toString();
+
+      // Notify client if commenter is NOT the client
+      if (updatedTicket.client && updatedTicket.client._id.toString() !== commenterId) {
+        notificationsToCreate.push({
+          userRef: updatedTicket.client._id,
+          userModel: 'User', // Assuming client model is 'User'
+          text: notificationText,
+          link: notificationLink
+        });
+      }
+
+      // Notify assigned technician if commenter is NOT the technician
+      if (updatedTicket.technician && updatedTicket.technician._id.toString() !== commenterId) {
+        notificationsToCreate.push({
+          userRef: updatedTicket.technician._id,
+          userModel: 'AdminUser', // Assuming technician model is 'AdminUser'
+          text: notificationText,
+          link: adminNotificationLink
+        });
+      }
+      
+      // Consider notifying other admins/roles if necessary
+      // Example: Notify all admins (excluding the commenter if they are admin)
+      // const allAdmins = await AdminUser.find({ _id: { $ne: commenterId } }).select('_id').lean();
+      // allAdmins.forEach(admin => {
+      //    // Avoid duplicate notification if admin is already the assigned tech
+      //    if (!updatedTicket.technician || updatedTicket.technician._id.toString() !== admin._id.toString()) {
+      //       notificationsToCreate.push({ userRef: admin._id, userModel: 'AdminUser', text: notificationText, link: adminNotificationLink });
+      //    }
+      // });
+
+      // Create notifications in the database
+      if (notificationsToCreate.length > 0) {
+        await Notification.insertMany(notificationsToCreate);
+        console.log(`Created ${notificationsToCreate.length} notifications in DB for ticket ${ticketId} comment`);
+      }
+
+      // Send HTTP response back
+      res.json(updatedTicket);
+
+    } catch (error) {
+      console.error('Error during notification or ticket population:', error);
+      // Send error response or fallback response
+      // Fetch the original ticket again if updatedTicket failed
+      const originalTicket = await Ticket.findById(ticketId).lean();
+      res.status(500).json(originalTicket || { message: 'Error processing request after comment save.' });
     }
-    // --- End Emit WebSocket Event ---
-
-    res.json(updatedTicket || ticket); // Send back populated ticket
+    // --- End Emit & Create ---
 
   } catch (error) {
     console.error('Error adding comment:', error);

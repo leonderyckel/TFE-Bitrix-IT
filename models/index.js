@@ -4,6 +4,7 @@ const UserSchema = require('./User');
 const TicketSchema = require('./Ticket');
 const adminUserSchema = require('./AdminUser');
 const clientSensitiveDataSchema = require('./ClientSensitiveData');
+const NotificationSchemaDefinition = require('./Notification');
 
 let models = null;
 
@@ -26,6 +27,7 @@ const initializeModels = async () => {
     const ticketMongooseSchema = new mongoose.Schema(TicketSchema);
     const adminUserMongooseSchema = new mongoose.Schema(adminUserSchema);
     const clientSensitiveDataMongooseSchema = new mongoose.Schema(clientSensitiveDataSchema);
+    const notificationMongooseSchema = new mongoose.Schema(NotificationSchemaDefinition, { timestamps: true });
 
     // Ajout des hooks aux schémas
     ticketMongooseSchema.pre('save', function(next) {
@@ -36,6 +38,7 @@ const initializeModels = async () => {
     // Initialisation des modèles publics
     const User = mainConnection.model('User', userMongooseSchema);
     const Ticket = mainConnection.model('Ticket', ticketMongooseSchema);
+    const Notification = mainConnection.model('Notification', notificationMongooseSchema);
 
     // Initialisation des modèles admin
     const AdminUser = adminConnection.model('AdminUser', adminUserMongooseSchema);
@@ -46,6 +49,7 @@ const initializeModels = async () => {
       Ticket,
       AdminUser,
       ClientSensitiveData,
+      Notification,
       mainConnection,
       adminConnection
     };

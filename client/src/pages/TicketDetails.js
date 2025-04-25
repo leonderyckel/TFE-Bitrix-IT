@@ -43,8 +43,10 @@ import { StaticDatePicker } from '@mui/x-date-pickers/StaticDatePicker';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import { useTheme } from '@mui/material/styles';
+import { useSnackbar } from 'notistack';
 import io from 'socket.io-client';
 import API_URL from '../config/api';
+import { addNotification } from '../store/slices/notificationSlice';
 
 dayjs.extend(isSameOrBefore);
 
@@ -57,6 +59,7 @@ function TicketDetails() {
   const dispatch = useDispatch();
   const { currentTicket, loading, error } = useSelector((state) => state.tickets);
   const theme = useTheme();
+  const { enqueueSnackbar } = useSnackbar();
   const [liveTicket, setLiveTicket] = useState(null);
   const socketRef = useRef();
   const [newComment, setNewComment] = useState('');
@@ -90,6 +93,13 @@ function TicketDetails() {
       console.log('Received ticket:updated', updatedTicket);
       if (updatedTicket._id === ticketId) {
         setLiveTicket(updatedTicket);
+        enqueueSnackbar(`Le ticket que vous consultez (${updatedTicket.title || 'sans titre'}) a été mis à jour.`, { 
+          variant: 'info' 
+        });
+        dispatch(addNotification({
+          text: `Le ticket que vous consultez (${updatedTicket.title || 'sans titre'}) a été mis à jour.`,
+          ticketId: updatedTicket._id
+        }));
       }
     });
 
@@ -98,7 +108,7 @@ function TicketDetails() {
       socket.disconnect();
     };
     
-  }, [ticketId, dispatch]);
+  }, [ticketId, dispatch, enqueueSnackbar]);
 
   const displayTicketData = liveTicket || currentTicket;
 

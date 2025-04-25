@@ -89,6 +89,7 @@ const startServer = async () => {
     // Routes
     app.use('/api', require('./routes/api'));
     app.use('/api/admin', require('./routes/admin'));
+    app.use('/api/notifications', require('./routes/notificationRoutes'));
 
     // Error handling middleware
     app.use((err, req, res, next) => {

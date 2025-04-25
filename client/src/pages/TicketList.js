@@ -23,7 +23,9 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import UpdateIcon from '@mui/icons-material/Update';
+import { useSnackbar } from 'notistack';
 import { fetchTickets, updateTicketInList } from '../store/slices/ticketSlice';
+import { addNotification } from '../store/slices/notificationSlice';
 import io from 'socket.io-client';
 import API_URL from '../config/api';
 
@@ -38,6 +40,7 @@ const TicketList = () => {
   const theme = useTheme();
   const socketRef = useRef();
   const joinedRoomsRef = useRef(new Set()); // Keep track of joined rooms
+  const { enqueueSnackbar } = useSnackbar();
 
   useEffect(() => {
     // Initial fetch
@@ -61,8 +64,35 @@ const TicketList = () => {
     // Listen for updates
     socket.on('ticket:updated', (updatedTicket) => {
       console.log('[TicketList] Received ticket:updated', updatedTicket);
-      // Dispatch action to update the ticket in the Redux store lists
+      
+      // 1. Update ticket list in Redux
       dispatch(updateTicketInList(updatedTicket)); 
+      
+      const notificationText = `Ticket #${updatedTicket._id.substring(0, 8)} (${updatedTicket.title || 'sans titre'}) a été mis à jour.`;
+
+      // 2. Show toast notification (optional)
+      enqueueSnackbar(notificationText, {
+        variant: 'info',
+        // Add action to navigate to ticket
+        action: (key) => (
+          <Button 
+            size="small" 
+            onClick={() => {
+              navigate(`/tickets/${updatedTicket._id}`);
+              // Ideally, close the snackbar here if possible
+            }}
+            sx={{ color: 'white' }}
+          >
+            Voir
+          </Button>
+        ),
+      });
+
+      // 3. Add notification to the Redux store for the menu
+      dispatch(addNotification({
+        text: notificationText,
+        ticketId: updatedTicket._id // Include ticketId for navigation
+      }));
     });
 
     // Cleanup
@@ -72,7 +102,7 @@ const TicketList = () => {
       joinedRoomsRef.current.clear();
     };
     // Run only on mount/unmount
-  }, [dispatch]); 
+  }, [dispatch, enqueueSnackbar, navigate]);
 
   // --- Effect to Manage Room Subscriptions based on tickets --- 
   useEffect(() => {

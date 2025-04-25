@@ -5,6 +5,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import store from './store';
 import { loadUserData } from './store/slices/authSlice';
+import { SnackbarProvider } from 'notistack';
 
 // Components
 import Layout from './components/Layout';
@@ -248,7 +249,16 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Router>
-          <AppContent />
+          <SnackbarProvider 
+            maxSnack={5}
+            anchorOrigin={{
+              vertical: 'top',
+              horizontal: 'right',
+            }}
+            autoHideDuration={4000}
+          > 
+            <AppContent />
+          </SnackbarProvider>
         </Router>
       </ThemeProvider>
     </Provider>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -16,7 +16,8 @@ import {
   Typography,
   ListItemButton,
   useTheme,
-  IconButton
+  IconButton,
+  Badge
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -26,20 +27,34 @@ import {
   People as ClientsIcon,
   Settings as SettingsIcon,
   MoreVert as MoreVertIcon,
-  CalendarMonth as CalendarMonthIcon
+  CalendarMonth as CalendarMonthIcon,
+  Notifications as NotificationsIcon,
+  Menu as MenuIcon
 } from '@mui/icons-material';
 import { logout } from '../store/slices/authSlice';
+import { 
+  fetchNotifications, 
+  markAllNotificationsAsRead,
+  markNotificationAsRead
+} from '../store/slices/notificationSlice';
 import Logo from './Logo';
 
 const drawerWidth = 260;
 
 const Layout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [anchorEl, setAnchorEl] = useState(null);
+  const [anchorElUser, setAnchorElUser] = useState(null);
+  const [anchorElNotif, setAnchorElNotif] = useState(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, isAdmin } = useSelector((state) => state.auth);
+  const { 
+    items: notifications, 
+    unreadCount, 
+    loading: notificationsLoading, 
+    error: notificationsError 
+  } = useSelector((state) => state.notifications);
   const theme = useTheme();
 
   useEffect(() => {
@@ -48,19 +63,55 @@ const Layout = () => {
     }
   }, [isAuthenticated, navigate]);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('[Layout] Auth detected, fetching initial notifications...');
+      dispatch(fetchNotifications());
+    }
+  }, [dispatch, isAuthenticated]);
+
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
+  const handleMenuOpenUser = (event) => {
+    setAnchorElUser(event.currentTarget);
   };
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
+  const handleMenuCloseUser = () => {
+    setAnchorElUser(null);
+  };
+
+  const handleMenuOpenNotif = (event) => {
+    setAnchorElNotif(event.currentTarget);
+    if (unreadCount > 0) { 
+       console.log(`[Layout] Opening menu with ${unreadCount} unread. Marking all as read...`);
+       dispatch(markAllNotificationsAsRead());
+    } else {
+       console.log(`[Layout] Opening menu with 0 unread.`);
+    }
+  };
+
+  const handleMenuCloseNotif = () => {
+    setAnchorElNotif(null);
+  };
+
+  const handleNotificationClick = (notification) => {
+    console.log('[Layout] Clicked notification:', notification);
+    const idToMark = notification._id;
+    if (!notification.read && idToMark) {
+      console.log(`[Layout] Marking notification ${idToMark} as read...`);
+      dispatch(markNotificationAsRead(idToMark)); 
+    }
+    if (notification.link) {
+      console.log(`[Layout] Navigating to link: ${notification.link}`);
+      navigate(notification.link);
+    }
+    handleMenuCloseNotif();
   };
 
   const handleLogout = () => {
+    handleMenuCloseUser();
     dispatch(logout());
     navigate('/login');
   };
@@ -69,6 +120,12 @@ const Layout = () => {
     if (path === '/admin/calendar') {
        return location.pathname === path;
     }
+    if (path === '/admin' && location.pathname === '/admin') {
+      return true;
+    }
+    if (path === '/admin') {
+        return false;
+    }    
     return location.pathname.startsWith(path);
   };
 
@@ -199,7 +256,7 @@ const Layout = () => {
           </Box>
           <IconButton
             size="small"
-            onClick={handleMenuOpen}
+            onClick={handleMenuOpenUser}
             aria-controls="account-menu"
             aria-haspopup="true"
           >
@@ -207,9 +264,9 @@ const Layout = () => {
           </IconButton>
           <Menu
             id="account-menu"
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleMenuClose}
+            anchorEl={anchorElUser}
+            open={Boolean(anchorElUser)}
+            onClose={handleMenuCloseUser}
             PaperProps={{
               elevation: 3,
               sx: {
@@ -218,16 +275,10 @@ const Layout = () => {
                 minWidth: 180
               }
             }}
-            anchorOrigin={{
-              vertical: 'top',
-              horizontal: 'right'
-            }}
-            transformOrigin={{
-              vertical: 'bottom',
-              horizontal: 'right'
-            }}
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
           >
-            <MenuItem onClick={handleMenuClose}>
+            <MenuItem onClick={handleMenuCloseUser}>
               <ListItemIcon>
                 <PersonIcon fontSize="small" />
               </ListItemIcon>
@@ -323,22 +374,96 @@ const Layout = () => {
             borderRadius: 1,
             boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
           }}>
-            <Typography 
-              variant="body2" 
+            <IconButton
+              color="inherit"
+              aria-label="open drawer"
+              edge="start"
+              onClick={handleDrawerToggle}
               sx={{ 
-                color: theme.palette.primary.main,
-                fontWeight: 500,
-                letterSpacing: '0.5px',
-                fontStyle: 'italic'
+                mr: 2, 
+                display: { xs: 'flex', sm: 'none' }, // Show only on mobile
+                color: theme.palette.text.primary, 
+                order: -1 // Ensure it appears first visually on mobile if needed
               }}
             >
-              {new Date().toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
-            </Typography>
+              <MenuIcon /> 
+            </IconButton>
+
+            <Box sx={{ flexGrow: 1, display: { xs: 'none', sm: 'block' } }} /> {/* Spacer for desktop */} 
+            
+            <Box sx={{ mr: 1 }}> 
+              <IconButton
+                size="large"
+                aria-label={`show ${unreadCount} new notifications`}
+                color="inherit"
+                onClick={handleMenuOpenNotif}
+                sx={{ color: theme.palette.text.secondary }} // Adjust icon color
+              >
+                <Badge badgeContent={unreadCount} color="error">
+                  <NotificationsIcon />
+                </Badge>
+              </IconButton>
+              <Menu
+                id="notifications-menu"
+                anchorEl={anchorElNotif}
+                open={Boolean(anchorElNotif)}
+                onClose={handleMenuCloseNotif}
+                PaperProps={{
+                  elevation: 3,
+                  sx: {
+                    mt: 1.5,
+                    maxHeight: 400,
+                    width: '320px',
+                    overflow: 'auto',
+                    borderRadius: 2
+                  }
+                }}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+              >
+                <Box sx={{ px: 2, py: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                   <Typography variant="subtitle1" fontWeight="bold">Notifications</Typography>
+                </Box>
+                <Divider />
+                {notificationsLoading && (
+                  <MenuItem disabled>
+                    <ListItemText primary="Chargement..." />
+                  </MenuItem>
+                )}
+                {notificationsError && (
+                  <MenuItem disabled>
+                    <ListItemText primary={`Erreur: ${notificationsError}`} sx={{ color: 'error.main' }} />
+                  </MenuItem>
+                )}
+                {!notificationsLoading && !notificationsError && notifications.length > 0 ? (
+                  notifications.map((notification) => (
+                    <MenuItem 
+                      key={notification._id}
+                      onClick={() => handleNotificationClick(notification)}
+                      sx={{ 
+                        bgcolor: notification.read ? 'transparent' : 'action.hover',
+                        whiteSpace: 'normal' 
+                      }}
+                    >
+                      <ListItemText 
+                        primary={notification.text} 
+                        primaryTypographyProps={{ 
+                           fontWeight: notification.read ? 'normal' : 'bold',
+                           variant: 'body2' 
+                        }}
+                        secondary={notification.createdAt ? new Date(notification.createdAt).toLocaleString() : null}
+                        secondaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
+                      />
+                    </MenuItem>
+                  ))
+                ) : null}
+                {!notificationsLoading && !notificationsError && notifications.length === 0 && (
+                  <MenuItem disabled>
+                    <ListItemText primary="Aucune notification" />
+                  </MenuItem>
+                )}
+              </Menu>
+            </Box>
           </Box>
         </Box>
         

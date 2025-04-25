@@ -188,48 +188,115 @@ router.put('/tickets/:id', async (req, res) => {
 
 // Ajouter un commentaire à un ticket
 router.post('/tickets/:id/comments', async (req, res) => {
+  console.log(`[Admin Comment] Received comment request for ticket ${req.params.id} by admin ${req.admin._id}`); // Log start
   try {
-    const { Ticket } = getModels();
+    // Get models (Ticket from main connection, Notification from main, AdminUser from admin)
+    const { Ticket, Notification, AdminUser } = getModels(); 
     const ticketId = req.params.id;
-    let ticket = await Ticket.findById(ticketId);
+    let ticket = await Ticket.findById(ticketId); // Get the ticket instance
     
     if (!ticket) {
+      console.log(`[Admin Comment] Ticket ${ticketId} not found.`);
       return res.status(404).json({ message: 'Ticket not found' });
     }
     
     // Add the comment using admin ID
-    ticket.comments.push({
-      user: req.admin._id, // Make sure this is correct field for admin comments
-      content: req.body.content
-    });
+    const newComment = {
+      user: req.admin._id, // Use admin ID from auth middleware
+      content: req.body.content,
+      // userModel: 'AdminUser' // Store user model if needed for comment population
+    };
+    ticket.comments.push(newComment);
+    console.log(`[Admin Comment] Pushed comment to ticket ${ticketId}. Saving...`);
     
-    await ticket.save();
+    await ticket.save(); // Save the ticket with the new comment
+    console.log(`[Admin Comment] Ticket ${ticketId} saved successfully.`);
 
-    // --- Emit WebSocket Event ---
-    // Fetch the updated ticket with necessary populated fields for the client view
-    const updatedTicket = await Ticket.findById(ticketId)
-      .populate('client', 'firstName lastName email company isCompanyBoss') // Populate client
-      .populate('comments.user', 'firstName lastName email') // Populate comment author
-      .populate({
-          path: 'technician',
-          select: 'firstName lastName email',
-          model: global.models.AdminUser // Assuming AdminUser model is needed
-       })
-      .lean(); // Use lean for plain JS object
+    // --- Emit WebSocket Event & Create Notification --- 
+    try {
+      console.log(`[Admin Comment] Populating ticket ${ticketId} for notification/emit...`);
+      // Fetch the updated ticket with populated fields for emitting and notification logic
+      // Ensure client and potentially technician are populated
+      const updatedTicket = await Ticket.findById(ticketId)
+        .populate('client', '_id firstName lastName') // Need client ID for notification
+        .populate('comments.user', 'firstName lastName email') // Populate comment author if needed for WS
+        .populate({ // Keep technician populated for WS event consistency
+            path: 'technician',
+            select: '_id firstName lastName email',
+            model: AdminUser // Use AdminUser model for population
+         })
+        .lean();
 
-    if (updatedTicket) {
-      // Emit to the room named after the ticket ID
-      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
-      console.log(`Emitted ticket:updated event to room ${ticketId}`);
+      if (!updatedTicket) {
+        console.error(`[Admin Comment] CRITICAL: Ticket ${ticketId} not found AFTER saving comment!`);
+        throw new Error('Ticket not found after saving admin comment');
+      }
+      console.log(`[Admin Comment] Ticket ${ticketId} populated. Client: ${updatedTicket.client?._id}, Technician: ${updatedTicket.technician?._id}`);
+
+      // Emit WebSocket event first
+      if (req.io) {
+        req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+        console.log(`[Admin Comment] Emitted ticket:updated event to room ${ticketId}`);
+      } else {
+        console.error('[Admin Comment] req.io not found.');
+      }
+
+      // Prepare notification details
+      const commenterName = req.admin.firstName || 'Admin/Technicien'; // Use admin info
+      const notificationText = `Nouveau commentaire de ${commenterName} sur le ticket #${ticketId.substring(0, 8)} (${updatedTicket.title || 'sans titre'})`;
+      const notificationLink = `/tickets/${ticketId}`; // Link for client 
+      console.log(`[Admin Comment] Preparing notification. Text: "${notificationText}", Link: ${notificationLink}`);
+
+      let notificationsToCreate = [];
+      const commenterId = req.admin._id.toString();
+      console.log(`[Admin Comment] Commenter ID: ${commenterId}`);
+
+      // Notify the client (User model)
+      if (updatedTicket.client && updatedTicket.client._id) { // Ensure client exists
+          console.log(`[Admin Comment] Client found (${updatedTicket.client._id}). Adding notification.`);
+          notificationsToCreate.push({
+              userRef: updatedTicket.client._id,
+              userModel: 'User', 
+              text: notificationText,
+              link: notificationLink
+          });
+      } else {
+          console.warn(`[Admin Comment] Ticket ${ticketId} has no client assigned, cannot notify.`);
+      }
+
+      // Don't notify the technician about their own comment
+      console.log(`[Admin Comment] Checking technician notification. Assigned Tech: ${updatedTicket.technician?._id}`);
+      if (updatedTicket.technician && updatedTicket.technician._id.toString() !== commenterId) {
+          console.log(`[Admin Comment] Technician (${updatedTicket.technician._id}) is different from commenter. Notifying technician is NOT YET IMPLEMENTED HERE for admin comments, only client.`);
+          // If you want admins/techs to notify other admins/techs (except themselves), add logic here:
+          // notificationsToCreate.push({ userRef: updatedTicket.technician._id, userModel: 'AdminUser', text: notificationText, link: adminNotificationLink });
+      } else if (updatedTicket.technician) {
+           console.log(`[Admin Comment] Technician ID is the same as commenter. Not notifying technician.`);
+      }
+      // Could potentially notify OTHER admins here if required
+
+      // Create notifications in the database
+      console.log(`[Admin Comment] Number of notifications to create: ${notificationsToCreate.length}`);
+      if (notificationsToCreate.length > 0) {
+        console.log(`[Admin Comment] Attempting to insert ${notificationsToCreate.length} notifications into DB...`);
+        await Notification.insertMany(notificationsToCreate);
+        console.log(`[Admin Comment] Successfully created ${notificationsToCreate.length} notifications in DB for ticket ${ticketId} admin comment`);
+      }
+
+      // Send HTTP response back with the updated ticket
+      console.log(`[Admin Comment] Sending HTTP response for ticket ${ticketId}`);
+      res.json(updatedTicket); 
+
+    } catch (error) {
+      console.error('[Admin Comment] Error during notification/population stage:', error);
+      // Fallback: send original ticket save result if population/notification failed
+      res.status(500).json(ticket.toObject()); // Send plain object
     }
-    // --- End Emit WebSocket Event ---
-    
-    // Send the updated ticket back in the HTTP response
-    res.json(updatedTicket || ticket); // Send updated if fetched, otherwise original save result
+    // --- End Emit & Create ---
 
   } catch (error) {
-    console.error('Error adding comment for admin:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+    console.error('[Admin Comment] Top-level error adding comment:', error);
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
   }
 });
 
@@ -324,32 +391,57 @@ router.post('/tickets/:id/progress', async (req, res) => {
     
     await ticket.save();
     
-    // --- Emit WebSocket Event ---
+    // --- Emit WebSocket Event & Create Notification --- 
     const ticketId = req.params.id;
-    const updatedTicket = await Ticket.findById(ticketId)
-      .populate('client', 'firstName lastName email company isCompanyBoss')
-      .populate('comments.user', 'firstName lastName email') 
-      .populate({
-          path: 'technician',
-          select: 'firstName lastName email',
-          model: global.models.AdminUser
-       })
-      .lean();
+    const { Notification, AdminUser } = getModels(); 
 
-    if (updatedTicket) {
-      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
-      console.log(`Emitted ticket:updated event to room ${ticketId} after progress update`);
+    try {
+      const updatedTicket = await Ticket.findById(ticketId)
+        .populate('client', '_id firstName lastName') // Populate client for notification
+        .populate('comments.user', 'firstName lastName email') 
+        .populate({
+            path: 'technician',
+            select: 'firstName lastName email',
+            model: AdminUser // Use AdminUser model
+         })
+        .lean();
+
+      if (updatedTicket) {
+        // Emit WebSocket first
+        if(req.io) {
+            req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+            console.log(`Emitted ticket:updated event to room ${ticketId} after progress update`);
+        } else {
+            console.error('req.io not found in admin progress update');
+        }
+
+        // Create Notification for the client
+        if (updatedTicket.client && updatedTicket.client._id) {
+          const notificationText = `La progression du ticket #${ticketId.substring(0, 8)} (${updatedTicket.title || 'sans titre'}) est passée à : ${status}. ${finalDescription || ''}`.trim();
+          const notificationLink = `/tickets/${ticketId}`;
+          
+          await Notification.create({
+            userRef: updatedTicket.client._id,
+            userModel: 'User',
+            text: notificationText,
+            link: notificationLink
+          });
+          console.log(`Created notification for client ${updatedTicket.client._id} about progress update.`);
+        } else {
+           console.warn(`Ticket ${ticketId} has no client assigned, cannot notify about progress.`);
+        }
+      } else {
+          console.error(`Failed to fetch updated ticket ${ticketId} after progress save.`);
+      }
+      // Send response regardless of notification success/failure
+      res.json(updatedTicket || ticket.toObject()); // Send updated if fetched
+
+    } catch(error) {
+        console.error('Error during notification/emit after progress update:', error);
+        res.status(500).json(ticket.toObject()); // Fallback response
     }
-    // --- End Emit WebSocket Event ---
+    // --- End Emit & Create ---
 
-    // Populate necessary fields before sending back (REMOVED - Already done above)
-    // await ticket.populate([
-    //   { path: 'client', select: 'firstName lastName email company' },
-    //   { path: 'comments.user', select: 'firstName lastName email' }
-    // ]);
-
-    // Return the updated and populated ticket
-    res.json(updatedTicket || ticket); // Send updated if fetched
   } catch (error) {
     console.error('Error adding progress update:', error);
     res.status(500).json({ message: 'Erreur serveur', error: error.message });
@@ -376,25 +468,64 @@ router.post('/tickets/:id/assign', async (req, res) => {
     ticket.status = 'in-progress';
     await ticket.save();
     
-    // --- Emit WebSocket Event ---
+    // --- Emit WebSocket Event & Create Notification --- 
     const ticketId = req.params.id;
-    const updatedTicket = await Ticket.findById(ticketId)
-      .populate('client', 'firstName lastName email company isCompanyBoss')
-      .populate('comments.user', 'firstName lastName email') 
-      .populate({
-          path: 'technician',
-          select: 'firstName lastName email',
-          model: global.models.AdminUser
-       })
-      .lean();
+    const { Notification } = getModels(); // Add Notification model
 
-    if (updatedTicket) {
-      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
-      console.log(`Emitted ticket:updated event to room ${ticketId} after assign`);
+    try {
+      const updatedTicket = await Ticket.findById(ticketId)
+        .populate('client', '_id firstName lastName') // Populate client
+        .populate('comments.user', 'firstName lastName email') 
+        .populate({
+            path: 'technician',
+            select: 'firstName lastName email',
+            model: AdminUser // Use AdminUser model
+         })
+        .lean();
+
+      if (updatedTicket) {
+        // Emit WebSocket first
+        if (req.io) {
+            req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+            console.log(`Emitted ticket:updated event to room ${ticketId} after assign`);
+        } else {
+            console.error('req.io not found in admin assign');
+        }
+        
+        // Create Notification for the client
+        if (updatedTicket.client && updatedTicket.client._id) {
+          const techName = updatedTicket.technician ? `${updatedTicket.technician.firstName} ${updatedTicket.technician.lastName}` : 'un technicien';
+          const notificationText = `Le ticket #${ticketId.substring(0, 8)} (${updatedTicket.title || 'sans titre'}) a été assigné à ${techName}.`;
+          const notificationLink = `/tickets/${ticketId}`;
+          
+          await Notification.create({
+            userRef: updatedTicket.client._id,
+            userModel: 'User',
+            text: notificationText,
+            link: notificationLink
+          });
+          console.log(`Created notification for client ${updatedTicket.client._id} about assignment.`);
+        } else {
+           console.warn(`Ticket ${ticketId} has no client assigned, cannot notify about assignment.`);
+        }
+        
+        // Optionally notify the assigned technician as well?
+        // if (updatedTicket.technician && updatedTicket.technician._id) {
+        //   await Notification.create({ userRef: updatedTicket.technician._id, userModel: 'AdminUser', text: `Vous avez été assigné au ticket...`, link: `/admin/tickets/${ticketId}` });
+        // }
+
+      } else {
+           console.error(`Failed to fetch updated ticket ${ticketId} after assignment save.`);
+      }
+      // Send response
+      res.json(updatedTicket || ticket.toObject());
+
+    } catch(error) {
+        console.error('Error during notification/emit after assignment:', error);
+        res.status(500).json(ticket.toObject()); // Fallback response
     }
-    // --- End Emit WebSocket Event ---
+    // --- End Emit & Create ---
 
-    res.json(updatedTicket || ticket);
   } catch (error) {
     console.error('Error assigning technician for admin:', error);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -434,25 +565,59 @@ router.post('/tickets/:id/cancel', async (req, res) => {
     });
     await ticket.save();
 
-    // --- Emit WebSocket Event ---
+    // --- Emit WebSocket Event & Create Notification --- 
     const ticketId = req.params.id;
-    const updatedTicket = await Ticket.findById(ticketId)
-      .populate('client', 'firstName lastName email company isCompanyBoss')
-      .populate('comments.user', 'firstName lastName email') 
-      .populate({
-          path: 'technician',
-          select: 'firstName lastName email',
-          model: global.models.AdminUser
-       })
-      .lean();
+    const { Notification, AdminUser } = getModels(); // Add Notification model
+    
+    try {
+        const updatedTicket = await Ticket.findById(ticketId)
+          .populate('client', '_id firstName lastName') // Populate client
+          .populate('comments.user', 'firstName lastName email') 
+          .populate({
+              path: 'technician',
+              select: 'firstName lastName email',
+              model: AdminUser // Use AdminUser model
+           })
+          .lean();
 
-    if (updatedTicket) {
-      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
-      console.log(`Emitted ticket:updated event to room ${ticketId} after cancel`);
+        if (updatedTicket) {
+            // Emit WebSocket first
+            if (req.io) {
+                req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+                console.log(`Emitted ticket:updated event to room ${ticketId} after cancel`);
+            } else {
+                 console.error('req.io not found in admin cancel');
+            }
+
+            // Create Notification for the client
+            if (updatedTicket.client && updatedTicket.client._id) {
+              const adminName = req.admin.firstName || 'Admin';
+              const notificationText = `Le ticket #${ticketId.substring(0, 8)} (${updatedTicket.title || 'sans titre'}) a été annulé par ${adminName}. Raison: ${reason.trim()}`;
+              // No link needed for a cancelled ticket?
+              // const notificationLink = `/tickets/${ticketId}`;
+              
+              await Notification.create({
+                userRef: updatedTicket.client._id,
+                userModel: 'User',
+                text: notificationText,
+                // link: notificationLink // Omit link or set to null
+              });
+              console.log(`Created notification for client ${updatedTicket.client._id} about cancellation.`);
+            } else {
+               console.warn(`Ticket ${ticketId} has no client assigned, cannot notify about cancellation.`);
+            }
+        } else {
+             console.error(`Failed to fetch updated ticket ${ticketId} after cancel save.`);
+        }
+        // Send response
+        res.json(updatedTicket || ticket.toObject());
+
+    } catch(error) {
+        console.error('Error during notification/emit after cancellation:', error);
+        res.status(500).json(ticket.toObject()); // Fallback response
     }
-    // --- End Emit WebSocket Event ---
+    // --- End Emit & Create ---
 
-    res.json(updatedTicket || ticket);
   } catch (error) {
     console.error('Error cancelling ticket:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -477,25 +642,58 @@ router.post('/tickets/:id/close', async (req, res) => {
     };
     await ticket.save();
     
-    // --- Emit WebSocket Event ---
+    // --- Emit WebSocket Event & Create Notification --- 
     const ticketId = req.params.id;
-    const updatedTicket = await Ticket.findById(ticketId)
-      .populate('client', 'firstName lastName email company isCompanyBoss')
-      .populate('comments.user', 'firstName lastName email') 
-      .populate({
-          path: 'technician',
-          select: 'firstName lastName email',
-          model: global.models.AdminUser
-       })
-      .lean();
+    const { Notification, AdminUser } = getModels(); // Add Notification model
 
-    if (updatedTicket) {
-      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
-      console.log(`Emitted ticket:updated event to room ${ticketId} after close`);
+    try {
+        const updatedTicket = await Ticket.findById(ticketId)
+          .populate('client', '_id firstName lastName') // Populate client
+          .populate('comments.user', 'firstName lastName email') 
+          .populate({
+              path: 'technician',
+              select: 'firstName lastName email',
+              model: AdminUser // Use AdminUser model
+           })
+          .lean();
+
+        if (updatedTicket) {
+            // Emit WebSocket first
+            if (req.io) {
+                req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+                console.log(`Emitted ticket:updated event to room ${ticketId} after close`);
+            } else {
+                 console.error('req.io not found in admin close');
+            }
+
+            // Create Notification for the client
+            if (updatedTicket.client && updatedTicket.client._id) {
+              const adminName = req.admin.firstName || 'Admin';
+              const notificationText = `Le ticket #${ticketId.substring(0, 8)} (${updatedTicket.title || 'sans titre'}) a été clôturé par ${adminName}.`;
+              const notificationLink = `/tickets/${ticketId}`;
+              
+              await Notification.create({
+                userRef: updatedTicket.client._id,
+                userModel: 'User',
+                text: notificationText,
+                link: notificationLink 
+              });
+              console.log(`Created notification for client ${updatedTicket.client._id} about closure.`);
+            } else {
+               console.warn(`Ticket ${ticketId} has no client assigned, cannot notify about closure.`);
+            }
+        } else {
+             console.error(`Failed to fetch updated ticket ${ticketId} after close save.`);
+        }
+        // Send response
+        res.json(updatedTicket || ticket.toObject());
+
+    } catch(error) {
+        console.error('Error during notification/emit after closure:', error);
+        res.status(500).json(ticket.toObject()); // Fallback response
     }
-    // --- End Emit WebSocket Event ---
+    // --- End Emit & Create ---
 
-    res.json(updatedTicket || ticket);
   } catch (error) {
     console.error('Error closing ticket for admin:', error);
     res.status(500).json({ message: 'Erreur serveur' });
