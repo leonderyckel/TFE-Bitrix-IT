@@ -4,6 +4,34 @@ const adminAuth = require('../middleware/adminAuth');
 const { getModels } = require('../models');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
+const nodemailer = require('nodemailer');
+
+// Configure nodemailer transporter for custom SMTP
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST,
+  port: parseInt(process.env.EMAIL_PORT, 10),
+  secure: process.env.EMAIL_SECURE === 'true', // true for 465, false for 587
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD
+  }
+});
+
+// Helper to send notification email
+async function sendNotificationEmail(to, subject, text) {
+  if (!to) return;
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      to,
+      subject,
+      text
+    });
+    console.log(`[Email] Notification sent to ${to}`);
+  } catch (err) {
+    console.error(`[Email] Failed to send notification to ${to}:`, err.message);
+  }
+}
 
 // Route de connexion admin
 router.post('/login', async (req, res) => {
@@ -218,7 +246,7 @@ router.post('/tickets/:id/comments', async (req, res) => {
       // Fetch the updated ticket with populated fields for emitting and notification logic
       // Ensure client and potentially technician are populated
       const updatedTicket = await Ticket.findById(ticketId)
-        .populate('client', '_id firstName lastName') // Need client ID for notification
+        .populate('client', '_id firstName lastName email') // Need client ID for notification
         .populate('comments.user', 'firstName lastName email') // Populate comment author if needed for WS
         .populate({ // Keep technician populated for WS event consistency
             path: 'technician',
@@ -252,7 +280,7 @@ router.post('/tickets/:id/comments', async (req, res) => {
       console.log(`[Admin Comment] Commenter ID: ${commenterId}`);
 
       // Notify the client (User model)
-      if (updatedTicket.client && updatedTicket.client._id) { // Ensure client exists
+      if (updatedTicket.client && updatedTicket.client._id) {
           console.log(`[Admin Comment] Client found (${updatedTicket.client._id}). Adding notification.`);
           notificationsToCreate.push({
               userRef: updatedTicket.client._id,
@@ -281,6 +309,14 @@ router.post('/tickets/:id/comments', async (req, res) => {
         console.log(`[Admin Comment] Attempting to insert ${notificationsToCreate.length} notifications into DB...`);
         await Notification.insertMany(notificationsToCreate);
         console.log(`[Admin Comment] Successfully created ${notificationsToCreate.length} notifications in DB for ticket ${ticketId} admin comment`);
+        // Send email notification to client if present
+        if (updatedTicket.client && updatedTicket.client.email) {
+          await sendNotificationEmail(
+            updatedTicket.client.email,
+            notificationText,
+            notificationText
+          );
+        }
       }
 
       // Send HTTP response back with the updated ticket
@@ -397,7 +433,7 @@ router.post('/tickets/:id/progress', async (req, res) => {
 
     try {
       const updatedTicket = await Ticket.findById(ticketId)
-        .populate('client', '_id firstName lastName') // Populate client for notification
+        .populate('client', '_id firstName lastName email') // Populate client for notification
         .populate('comments.user', 'firstName lastName email') 
         .populate({
             path: 'technician',
@@ -417,15 +453,40 @@ router.post('/tickets/:id/progress', async (req, res) => {
 
         // Create Notification for the client
         if (updatedTicket.client && updatedTicket.client._id) {
-          const notificationText = `La progression du ticket #${ticketId.substring(0, 8)} (${updatedTicket.title || 'sans titre'}) est passée à : ${status}. ${finalDescription || ''}`.trim();
+          // English status labels
+          const statusLabels = {
+            'logged': 'logged',
+            'assigned': 'assigned',
+            'quote-sent': 'quote sent',
+            'hardware-ordered': 'hardware ordered',
+            'scheduled': 'scheduled',
+            'rescheduled': 'rescheduled',
+            'closed': 'closed'
+          };
+          const statusLabel = statusLabels[status] || status;
+          let notificationText = `Ticket ${updatedTicket.title || 'untitled'} ${statusLabel}`;
+          if (
+            finalDescription &&
+            finalDescription.trim() &&
+            finalDescription.trim().toLowerCase() !== statusLabel.toLowerCase()
+          ) {
+            notificationText += `: ${finalDescription.trim()}`;
+          }
           const notificationLink = `/tickets/${ticketId}`;
-          
           await Notification.create({
             userRef: updatedTicket.client._id,
             userModel: 'User',
             text: notificationText,
             link: notificationLink
           });
+          // Send email notification to client
+          if (updatedTicket.client.email) {
+            await sendNotificationEmail(
+              updatedTicket.client.email,
+              notificationText,
+              notificationText
+            );
+          }
           console.log(`Created notification for client ${updatedTicket.client._id} about progress update.`);
         } else {
            console.warn(`Ticket ${ticketId} has no client assigned, cannot notify about progress.`);
@@ -434,7 +495,7 @@ router.post('/tickets/:id/progress', async (req, res) => {
           console.error(`Failed to fetch updated ticket ${ticketId} after progress save.`);
       }
       // Send response regardless of notification success/failure
-      res.json(updatedTicket || ticket.toObject()); // Send updated if fetched
+      res.json(updatedTicket || ticket.toObject());
 
     } catch(error) {
         console.error('Error during notification/emit after progress update:', error);
@@ -474,7 +535,7 @@ router.post('/tickets/:id/assign', async (req, res) => {
 
     try {
       const updatedTicket = await Ticket.findById(ticketId)
-        .populate('client', '_id firstName lastName') // Populate client
+        .populate('client', '_id firstName lastName email') // Populate client
         .populate('comments.user', 'firstName lastName email') 
         .populate({
             path: 'technician',
@@ -504,6 +565,14 @@ router.post('/tickets/:id/assign', async (req, res) => {
             text: notificationText,
             link: notificationLink
           });
+          // Send email notification to client
+          if (updatedTicket.client.email) {
+            await sendNotificationEmail(
+              updatedTicket.client.email,
+              notificationText,
+              notificationText
+            );
+          }
           console.log(`Created notification for client ${updatedTicket.client._id} about assignment.`);
         } else {
            console.warn(`Ticket ${ticketId} has no client assigned, cannot notify about assignment.`);
@@ -571,7 +640,7 @@ router.post('/tickets/:id/cancel', async (req, res) => {
     
     try {
         const updatedTicket = await Ticket.findById(ticketId)
-          .populate('client', '_id firstName lastName') // Populate client
+          .populate('client', '_id firstName lastName email') // Populate client
           .populate('comments.user', 'firstName lastName email') 
           .populate({
               path: 'technician',
@@ -602,6 +671,14 @@ router.post('/tickets/:id/cancel', async (req, res) => {
                 text: notificationText,
                 // link: notificationLink // Omit link or set to null
               });
+              // Send email notification to client
+              if (updatedTicket.client.email) {
+                await sendNotificationEmail(
+                  updatedTicket.client.email,
+                  notificationText,
+                  notificationText
+                );
+              }
               console.log(`Created notification for client ${updatedTicket.client._id} about cancellation.`);
             } else {
                console.warn(`Ticket ${ticketId} has no client assigned, cannot notify about cancellation.`);
@@ -648,7 +725,7 @@ router.post('/tickets/:id/close', async (req, res) => {
 
     try {
         const updatedTicket = await Ticket.findById(ticketId)
-          .populate('client', '_id firstName lastName') // Populate client
+          .populate('client', '_id firstName lastName email') // Populate client
           .populate('comments.user', 'firstName lastName email') 
           .populate({
               path: 'technician',
@@ -678,6 +755,14 @@ router.post('/tickets/:id/close', async (req, res) => {
                 text: notificationText,
                 link: notificationLink 
               });
+              // Send email notification to client
+              if (updatedTicket.client.email) {
+                await sendNotificationEmail(
+                  updatedTicket.client.email,
+                  notificationText,
+                  notificationText
+                );
+              }
               console.log(`Created notification for client ${updatedTicket.client._id} about closure.`);
             } else {
                console.warn(`Ticket ${ticketId} has no client assigned, cannot notify about closure.`);
