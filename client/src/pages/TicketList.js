@@ -62,24 +62,23 @@ const TicketList = () => {
     });
 
     // Listen for updates
-    socket.on('ticket:updated', (updatedTicket) => {
+    socket.on('ticket:updated', (payload) => {
+      const updatedTicket = payload; // Extract ticket data
+      const notificationText = payload.notificationText || `Ticket ${updatedTicket.title || 'untitled'} updated`; // Use specific text or fallback
       console.log('[TicketList] Received ticket:updated', updatedTicket);
-      
+      console.log('[TicketList] Notification text received:', notificationText);
+
       // 1. Update ticket list in Redux
       dispatch(updateTicketInList(updatedTicket)); 
       
-      const notificationText = `Ticket #${updatedTicket._id.substring(0, 8)} (${updatedTicket.title || 'sans titre'}) a été mis à jour.`;
-
       // 2. Show toast notification (optional)
       enqueueSnackbar(notificationText, {
         variant: 'info',
-        // Add action to navigate to ticket
         action: (key) => (
           <Button 
             size="small" 
             onClick={() => {
               navigate(`/tickets/${updatedTicket._id}`);
-              // Ideally, close the snackbar here if possible
             }}
             sx={{ color: 'white' }}
           >
@@ -90,8 +89,8 @@ const TicketList = () => {
 
       // 3. Add notification to the Redux store for the menu
       dispatch(addNotification({
-        text: notificationText,
-        ticketId: updatedTicket._id // Include ticketId for navigation
+        text: notificationText, // Use the specific text
+        ticketId: updatedTicket._id
       }));
     });
 

@@ -18,14 +18,76 @@ const transporter = nodemailer.createTransport({
 });
 
 // Helper to send notification email
-async function sendNotificationEmail(to, subject, text) {
+async function sendNotificationEmail(to, subject, text, currentStatus) {
   if (!to) return;
+  const logoUrl = 'https://i.imgur.com/anor60B.jpeg';
+  const allSteps = ['logged', 'assigned', 'quote sent', 'hardware ordered', 'scheduled', 'closed'];
+  const statusLabels = {
+    'logged': 'Logged',
+    'assigned': 'Assigned',
+    'quote sent': 'Quote Sent',
+    'hardware ordered': 'Hardware Ordered',
+    'scheduled': 'Scheduled',
+    'closed': 'Closed',
+    'in-progress': 'In Progress'
+  };
+  const current = (currentStatus||'').toLowerCase();
+  const isClosed = current === 'closed';
+  const firstLabel = text;
+  // Si fermé, second rond vert 'Closed', sinon orange 'In Progress'
+  const secondLabel = isClosed ? 'Closed' : 'In Progress';
+  const secondColor = isClosed ? '#43a047' : '#FFA726';
+  const secondLabelColor = isClosed ? '#43a047' : '#FFA726';
+  const progressBarHtml = isClosed ? `
+    <div style=\"display: flex; justify-content: center; align-items: center; margin: 32px 0 32px 0;\">
+      <div style=\"display: flex; flex-direction: column; align-items: center; margin-right: 8px;\">
+        <div style=\"width: 28px; height: 28px; border-radius: 50%; background: #1976d2; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: bold; margin-bottom: 4px;\"></div>
+        <div style=\"font-size: 12px; color: #1976d2; text-align: center; max-width: 180px; font-weight: bold;\">${firstLabel}</div>
+      </div>
+      <div style=\"width: 36px; height: 2px; background: #1976d2; margin-bottom: 18px;\"></div>
+      <div style=\"display: flex; flex-direction: column; align-items: center; margin-left: 8px;\">
+        <div style=\"width: 28px; height: 28px; border-radius: 50%; background: #43a047; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: bold; margin-bottom: 4px;\"></div>
+        <div style=\"font-size: 12px; color: #43a047; text-align: center; max-width: 90px; font-weight: bold;\">Closed</div>
+      </div>
+    </div>
+  ` : `
+    <div style=\"display: flex; justify-content: center; align-items: center; margin: 32px 0 32px 0;\">
+      <div style=\"display: flex; flex-direction: column; align-items: center; margin-right: 8px;\">
+        <div style=\"width: 28px; height: 28px; border-radius: 50%; background: #1976d2; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: bold; margin-bottom: 4px;\"></div>
+        <div style=\"font-size: 12px; color: #1976d2; text-align: center; max-width: 180px; font-weight: bold;\">${firstLabel}</div>
+      </div>
+      <div style=\"width: 36px; height: 2px; background: #1976d2; margin-bottom: 18px;\"></div>
+      <div style=\"display: flex; flex-direction: column; align-items: center; margin-left: 8px;\">
+        <div style=\"width: 28px; height: 28px; border-radius: 50%; background: ${secondColor}; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: bold; margin-bottom: 4px;\"></div>
+        <div style=\"font-size: 12px; color: ${secondLabelColor}; text-align: center; max-width: 90px; font-weight: bold;\">${secondLabel}</div>
+      </div>
+    </div>
+  `;
   try {
     await transporter.sendMail({
       from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
       to,
       subject,
-      text
+      text,
+      html: `
+        <div style=\"font-family: Arial, sans-serif; color: #222; background: #f7f7f7; padding: 24px;\">
+          <div style=\"background: #fff; border-radius: 8px; max-width: 480px; margin: auto; box-shadow: 0 2px 8px #0001; padding: 32px 24px;\">
+            <div style=\"display: flex; align-items: flex-start; margin-bottom: 16px;\">
+              <img src=\"${logoUrl}\" alt=\"Bitrix Logo\" width=\"120\" height=\"60\" style=\"max-width: 120px; max-height: 60px; width: 120px; height: 60px; display: block; margin: 0 0 16px 0; float: left;\" />
+              <h2 style=\"color: #1976d2; margin: 0 0 0 16px; font-size: 1.5em; align-self: center; flex: 1; text-align: left;\">Bitrix IT Support</h2>
+            </div>
+            ${progressBarHtml}
+            <div style=\"font-size: 1.15em; color: #222; text-align: center; margin-bottom: 32px; margin-top: 24px;\">
+              ${text.replace(/\n/g, '<br>')}
+            </div>
+            <hr style=\"margin: 32px 0; border: none; border-top: 1px solid #eee;\" />
+            <div style=\"font-size: 0.95em; color: #888; text-align: center;\">
+              This is an automatic notification from Bitrix IT Support.<br>
+              Please do not reply directly to this email.
+            </div>
+          </div>
+        </div>
+      `
     });
     console.log(`[Email] Notification sent to ${to}`);
   } catch (err) {
@@ -202,7 +264,9 @@ router.put('/tickets/:id', async (req, res) => {
       .lean();
 
     if (updatedTicket) {
-      req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+      // Include a generic notification text for direct PUT updates
+      const notificationText = `Ticket ${updatedTicket.title || 'untitled'} details updated`;
+      req.io.to(ticketId).emit('ticket:updated', { ...updatedTicket, notificationText });
       console.log(`Emitted ticket:updated event to room ${ticketId} after PUT update`);
     }
     // --- End Emit WebSocket Event ---
@@ -263,16 +327,18 @@ router.post('/tickets/:id/comments', async (req, res) => {
 
       // Emit WebSocket event first
       if (req.io) {
-        req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+        // Include notification text in the payload
+        req.io.to(ticketId).emit('ticket:updated', { ...updatedTicket, notificationText });
         console.log(`[Admin Comment] Emitted ticket:updated event to room ${ticketId}`);
       } else {
         console.error('[Admin Comment] req.io not found.');
       }
 
       // Prepare notification details
-      const commenterName = req.admin.firstName || 'Admin/Technicien'; // Use admin info
-      const notificationText = `Nouveau commentaire de ${commenterName} sur le ticket #${ticketId.substring(0, 8)} (${updatedTicket.title || 'sans titre'})`;
-      const notificationLink = `/tickets/${ticketId}`; // Link for client 
+      const commenterName = req.admin.firstName || 'Admin/Technician';
+      // Use English and specific format, no ID
+      const notificationText = `New comment from ${commenterName} on ticket ${updatedTicket.title || 'untitled'}`;
+      const notificationLink = `/tickets/${ticketId}`;
       console.log(`[Admin Comment] Preparing notification. Text: "${notificationText}", Link: ${notificationLink}`);
 
       let notificationsToCreate = [];
@@ -314,7 +380,8 @@ router.post('/tickets/:id/comments', async (req, res) => {
           await sendNotificationEmail(
             updatedTicket.client.email,
             notificationText,
-            notificationText
+            notificationText,
+            updatedTicket.status
           );
         }
       }
@@ -433,73 +500,81 @@ router.post('/tickets/:id/progress', async (req, res) => {
 
     try {
       const updatedTicket = await Ticket.findById(ticketId)
-        .populate('client', '_id firstName lastName email') // Populate client for notification
+        .populate('client', '_id firstName lastName email')
         .populate('comments.user', 'firstName lastName email') 
         .populate({
             path: 'technician',
             select: 'firstName lastName email',
-            model: AdminUser // Use AdminUser model
+            model: AdminUser
          })
         .lean();
+
+      // Define notificationText BEFORE emitting
+      let notificationText = '';
+      if (status === 'assigned') {
+        const techName = updatedTicket?.technician ? `${updatedTicket.technician.firstName} ${updatedTicket.technician.lastName}` : 'a technician';
+        notificationText = `Ticket ${updatedTicket?.title || 'untitled'} assigned to ${techName}`;
+      } else {
+        const statusLabelsProgress = {
+          'logged': 'logged',
+          'quote-sent': 'quote sent',
+          'hardware-ordered': 'hardware ordered',
+          'scheduled': 'scheduled',
+          'rescheduled': 'rescheduled',
+          'closed': 'closed'
+        };
+        const statusLabel = statusLabelsProgress[status] || status;
+        if (finalDescription && finalDescription.trim()) {
+          if (finalDescription.trim().toLowerCase().includes(statusLabel.toLowerCase())) {
+            notificationText = `Ticket ${updatedTicket?.title || 'untitled'} ${finalDescription.trim()}`;
+          } else {
+            notificationText = `Ticket ${updatedTicket?.title || 'untitled'} ${statusLabel} ${finalDescription.trim()}`;
+          }
+        } else {
+          notificationText = `Ticket ${updatedTicket?.title || 'untitled'} ${statusLabel}`;
+        }
+      }
 
       if (updatedTicket) {
         // Emit WebSocket first
         if(req.io) {
-            req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+            req.io.to(ticketId).emit('ticket:updated', { ...updatedTicket, notificationText });
             console.log(`Emitted ticket:updated event to room ${ticketId} after progress update`);
         } else {
             console.error('req.io not found in admin progress update');
         }
 
-        // Create Notification for the client
-        if (updatedTicket.client && updatedTicket.client._id) {
-          // English status labels
-          const statusLabels = {
-            'logged': 'logged',
-            'assigned': 'assigned',
-            'quote-sent': 'quote sent',
-            'hardware-ordered': 'hardware ordered',
-            'scheduled': 'scheduled',
-            'rescheduled': 'rescheduled',
-            'closed': 'closed'
-          };
-          const statusLabel = statusLabels[status] || status;
-          let notificationText = `Ticket ${updatedTicket.title || 'untitled'} ${statusLabel}`;
-          if (
-            finalDescription &&
-            finalDescription.trim() &&
-            finalDescription.trim().toLowerCase() !== statusLabel.toLowerCase()
-          ) {
-            notificationText += `: ${finalDescription.trim()}`;
-          }
+        // Create Notification for the client, ONLY IF STATUS IS NOT 'assigned'
+        if (status !== 'assigned' && updatedTicket.client && updatedTicket.client._id) {
           const notificationLink = `/tickets/${ticketId}`;
           await Notification.create({
             userRef: updatedTicket.client._id,
             userModel: 'User',
-            text: notificationText,
+            text: notificationText, // Use the already defined text
             link: notificationLink
           });
-          // Send email notification to client
           if (updatedTicket.client.email) {
             await sendNotificationEmail(
               updatedTicket.client.email,
               notificationText,
-              notificationText
+              notificationText,
+              updatedTicket.status
             );
           }
-          console.log(`Created notification for client ${updatedTicket.client._id} about progress update.`);
+          console.log(`Created notification for client ${updatedTicket.client._id} about progress update (status: ${status}).`);
+        } else if (status === 'assigned') {
+          console.log(`Notification for 'assigned' status skipped in progress route, handled by /assign route.`);
         } else {
-           console.warn(`Ticket ${ticketId} has no client assigned, cannot notify about progress.`);
+           console.warn(`Ticket ${ticketId} has no client assigned, cannot notify about progress (status: ${status}).`);
         }
       } else {
           console.error(`Failed to fetch updated ticket ${ticketId} after progress save.`);
       }
-      // Send response regardless of notification success/failure
       res.json(updatedTicket || ticket.toObject());
 
     } catch(error) {
         console.error('Error during notification/emit after progress update:', error);
-        res.status(500).json(ticket.toObject()); // Fallback response
+        res.status(500).json(ticket.toObject());
     }
     // --- End Emit & Create ---
 
@@ -547,7 +622,8 @@ router.post('/tickets/:id/assign', async (req, res) => {
       if (updatedTicket) {
         // Emit WebSocket first
         if (req.io) {
-            req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+            // Include notification text in the payload
+            req.io.to(ticketId).emit('ticket:updated', { ...updatedTicket, notificationText });
             console.log(`Emitted ticket:updated event to room ${ticketId} after assign`);
         } else {
             console.error('req.io not found in admin assign');
@@ -555,8 +631,8 @@ router.post('/tickets/:id/assign', async (req, res) => {
         
         // Create Notification for the client
         if (updatedTicket.client && updatedTicket.client._id) {
-          const techName = updatedTicket.technician ? `${updatedTicket.technician.firstName} ${updatedTicket.technician.lastName}` : 'un technicien';
-          const notificationText = `Le ticket #${ticketId.substring(0, 8)} (${updatedTicket.title || 'sans titre'}) a été assigné à ${techName}.`;
+          const techName = updatedTicket.technician ? `${updatedTicket.technician.firstName} ${updatedTicket.technician.lastName}` : 'a technician';
+          let notificationText = `Ticket ${updatedTicket.title || 'untitled'} assigned to ${techName}`;
           const notificationLink = `/tickets/${ticketId}`;
           
           await Notification.create({
@@ -570,7 +646,8 @@ router.post('/tickets/:id/assign', async (req, res) => {
             await sendNotificationEmail(
               updatedTicket.client.email,
               notificationText,
-              notificationText
+              notificationText,
+              updatedTicket.status
             );
           }
           console.log(`Created notification for client ${updatedTicket.client._id} about assignment.`);
@@ -652,7 +729,8 @@ router.post('/tickets/:id/cancel', async (req, res) => {
         if (updatedTicket) {
             // Emit WebSocket first
             if (req.io) {
-                req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+                // Include notification text in the payload
+                req.io.to(ticketId).emit('ticket:updated', { ...updatedTicket, notificationText });
                 console.log(`Emitted ticket:updated event to room ${ticketId} after cancel`);
             } else {
                  console.error('req.io not found in admin cancel');
@@ -661,10 +739,10 @@ router.post('/tickets/:id/cancel', async (req, res) => {
             // Create Notification for the client
             if (updatedTicket.client && updatedTicket.client._id) {
               const adminName = req.admin.firstName || 'Admin';
-              const notificationText = `Le ticket #${ticketId.substring(0, 8)} (${updatedTicket.title || 'sans titre'}) a été annulé par ${adminName}. Raison: ${reason.trim()}`;
-              // No link needed for a cancelled ticket?
-              // const notificationLink = `/tickets/${ticketId}`;
-              
+              let notificationText = `Ticket ${updatedTicket.title || 'untitled'} cancelled by ${adminName}`;
+              if (reason && reason.trim()) {
+                notificationText += `: ${reason.trim()}`;
+              }
               await Notification.create({
                 userRef: updatedTicket.client._id,
                 userModel: 'User',
@@ -676,7 +754,8 @@ router.post('/tickets/:id/cancel', async (req, res) => {
                 await sendNotificationEmail(
                   updatedTicket.client.email,
                   notificationText,
-                  notificationText
+                  notificationText,
+                  updatedTicket.status
                 );
               }
               console.log(`Created notification for client ${updatedTicket.client._id} about cancellation.`);
@@ -737,7 +816,8 @@ router.post('/tickets/:id/close', async (req, res) => {
         if (updatedTicket) {
             // Emit WebSocket first
             if (req.io) {
-                req.io.to(ticketId).emit('ticket:updated', updatedTicket);
+                // Include notification text in the payload
+                req.io.to(ticketId).emit('ticket:updated', { ...updatedTicket, notificationText });
                 console.log(`Emitted ticket:updated event to room ${ticketId} after close`);
             } else {
                  console.error('req.io not found in admin close');
@@ -745,10 +825,11 @@ router.post('/tickets/:id/close', async (req, res) => {
 
             // Create Notification for the client
             if (updatedTicket.client && updatedTicket.client._id) {
-              const adminName = req.admin.firstName || 'Admin';
-              const notificationText = `Le ticket #${ticketId.substring(0, 8)} (${updatedTicket.title || 'sans titre'}) a été clôturé par ${adminName}.`;
+              let notificationText = `Ticket ${updatedTicket.title || 'untitled'} closed`;
+              if (req.body.resolutionDescription && req.body.resolutionDescription.trim()) {
+                notificationText += `: ${req.body.resolutionDescription.trim()}`;
+              }
               const notificationLink = `/tickets/${ticketId}`;
-              
               await Notification.create({
                 userRef: updatedTicket.client._id,
                 userModel: 'User',
@@ -760,7 +841,8 @@ router.post('/tickets/:id/close', async (req, res) => {
                 await sendNotificationEmail(
                   updatedTicket.client.email,
                   notificationText,
-                  notificationText
+                  notificationText,
+                  updatedTicket.status
                 );
               }
               console.log(`Created notification for client ${updatedTicket.client._id} about closure.`);

@@ -89,15 +89,17 @@ function TicketDetails() {
       console.log('Socket disconnected');
     });
 
-    socket.on('ticket:updated', (updatedTicket) => {
+    socket.on('ticket:updated', (payload) => {
+      const updatedTicket = payload;
+      const notificationText = payload.notificationText || `Ticket ${updatedTicket.title || 'untitled'} updated`;
       console.log('Received ticket:updated', updatedTicket);
       if (updatedTicket._id === ticketId) {
         setLiveTicket(updatedTicket);
-        enqueueSnackbar(`Le ticket que vous consultez (${updatedTicket.title || 'sans titre'}) a été mis à jour.`, { 
+        enqueueSnackbar(notificationText, { 
           variant: 'info' 
         });
         dispatch(addNotification({
-          text: `Le ticket que vous consultez (${updatedTicket.title || 'sans titre'}) a été mis à jour.`,
+          text: notificationText,
           ticketId: updatedTicket._id
         }));
       }
