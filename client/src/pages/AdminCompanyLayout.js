@@ -12,7 +12,11 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import axios from 'axios';
 import API_URL from '../config/api';
-import { Tldraw, useEditor } from '@tldraw/tldraw'; // Import tldraw
+import { 
+    Tldraw, 
+    useEditor, 
+    loadSnapshot // Importe la nouvelle fonction
+} from '@tldraw/tldraw'; // Import tldraw
 import '@tldraw/tldraw/tldraw.css'; // Import styles tldraw
 import { useSnackbar } from 'notistack';
 
@@ -28,8 +32,9 @@ const TldrawEditor = ({ initialSnapshot, companyName }) => {
         // Charge le snapshot initial s'il existe
         if (initialSnapshot) {
             try {
-                editor.store.loadSnapshot(initialSnapshot);
-                console.log('[tldraw] Initial snapshot loaded.');
+                // Utilise la nouvelle fonction importée
+                loadSnapshot(editor.store, initialSnapshot); 
+                console.log('[tldraw] Initial snapshot loaded using loadSnapshot function.');
             } catch (error) {
                 console.error('[tldraw] Error loading snapshot:', error);
                 enqueueSnackbar('Error loading saved layout.', { variant: 'error' });
@@ -76,7 +81,7 @@ const TldrawEditor = ({ initialSnapshot, companyName }) => {
                 <Tldraw 
                     persistenceKey={`tldraw_layout_${companyName}`} // Clé unique pour état local (optionnel)
                     onMount={handleMount} 
-                    // snapshot={initialSnapshot} // On charge via handleMount
+                    userInteractionPriority="high"
                 />
             </Box>
         </>
