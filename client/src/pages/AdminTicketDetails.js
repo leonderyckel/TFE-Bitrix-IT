@@ -546,15 +546,34 @@ function AdminTicketDetails() {
                               <Button
                                 size="small"
                                 variant="outlined"
-                                onClick={() => {
-                                  const description = window.prompt(`Add description for ${step.label} step:`);
-                                  if (description !== null) {
-                                    handleUpdateProgress(step.value, description || `${step.label} completed`, selectedTechnicianForAssign);
+                                onClick={async () => {
+                                  const description = window.prompt(`Add description for ${step.label} step:`, `${step.label} completed`);
+                                  if (description !== null && selectedTechnicianForAssign) {
+                                    try {
+                                      setSubmitting(true);
+                                      setError(null);
+                                      const response = await axios.post(
+                                        `${API_URL}/admin/tickets/${ticketId}/assign`,
+                                        { technicianId: selectedTechnicianForAssign },
+                                        {
+                                          headers: { Authorization: `Bearer ${token}` }
+                                        }
+                                      );
+                                      console.log('[Assign Button] API Response Data:', response.data);
+                                      console.log('[Assign Button] Progress in Response:', response.data?.progress);
+                                      setTicket(response.data);
+                                      setSelectedTechnician(selectedTechnicianForAssign);
+                                    } catch (assignError) {
+                                      console.error('Error assigning technician:', assignError);
+                                      setError('Failed to assign technician. ' + (assignError.response?.data?.message || assignError.message));
+                                    } finally {
+                                      setSubmitting(false);
+                                    }
                                   }
                                 }}
                                 disabled={submitting || !selectedTechnicianForAssign}
                               >
-                                Mark as Done
+                                Assign
                               </Button>
                             </>
                           ) : (

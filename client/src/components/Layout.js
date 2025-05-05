@@ -29,7 +29,8 @@ import {
   MoreVert as MoreVertIcon,
   CalendarMonth as CalendarMonthIcon,
   Notifications as NotificationsIcon,
-  Menu as MenuIcon
+  Menu as MenuIcon,
+  Business as CompanyIcon
 } from '@mui/icons-material';
 import { logout } from '../store/slices/authSlice';
 import { 
@@ -133,6 +134,7 @@ const Layout = () => {
     { text: 'Tickets', icon: <SupportIcon />, path: '/admin' },
     { text: 'Calendar', icon: <CalendarMonthIcon />, path: '/admin/calendar' },
     { text: 'Clients', icon: <ClientsIcon />, path: '/admin/clients' },
+    { text: 'Companies', icon: <CompanyIcon />, path: '/admin/companies' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' }
   ] : [
     { text: 'Tickets', icon: <SupportIcon />, path: '/tickets' },
@@ -167,7 +169,9 @@ const Layout = () => {
               >
                 <ListItemButton
                   onClick={() => {
+                    console.log(`[Layout] Attempting to navigate to: ${item.path}`);
                     navigate(item.path);
+                    console.log(`[Layout] Navigation to ${item.path} called.`);
                     setMobileOpen(false);
                   }}
                   sx={{

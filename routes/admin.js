@@ -39,29 +39,37 @@ async function sendNotificationEmail(to, subject, text, currentStatus) {
   const secondColor = isClosed ? '#43a047' : '#FFA726';
   const secondLabelColor = isClosed ? '#43a047' : '#FFA726';
   const progressBarHtml = isClosed ? `
-    <div style=\"display: flex; justify-content: center; align-items: center; margin: 32px 0 32px 0;\">
-      <div style=\"display: flex; flex-direction: column; align-items: center; margin-right: 8px;\">
-        <div style=\"width: 28px; height: 28px; border-radius: 50%; background: #1976d2; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: bold; margin-bottom: 4px;\"></div>
-        <div style=\"font-size: 12px; color: #1976d2; text-align: center; max-width: 180px; font-weight: bold;\">${firstLabel}</div>
-      </div>
-      <div style=\"width: 36px; height: 2px; background: #1976d2; margin-bottom: 18px;\"></div>
-      <div style=\"display: flex; flex-direction: column; align-items: center; margin-left: 8px;\">
-        <div style=\"width: 28px; height: 28px; border-radius: 50%; background: #43a047; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: bold; margin-bottom: 4px;\"></div>
-        <div style=\"font-size: 12px; color: #43a047; text-align: center; max-width: 90px; font-weight: bold;\">Closed</div>
-      </div>
-    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 32px 0 32px 0;">
+      <tr>
+        <td align="center" style="padding: 0 5px; vertical-align: top; width: 40%;">
+          <div style=\"width: 30px; height: 30px; border-radius: 50%; background: #1976d2; margin: 0 auto 6px auto;\"></div>
+          <div style=\"font-size: 12px; color: #1976d2; text-align: center; font-weight: bold; line-height: 1.3;\">${firstLabel}</div>
+        </td>
+        <td align="center" style="width: 20%; padding: 0; vertical-align: middle;">
+          <div style=\"height: 2px; background: #1976d2; width: 100%; margin-bottom: 20px; /* Ajuste pour centrer verticalement avec les labels */\"></div>
+        </td>
+        <td align="center" style="padding: 0 5px; vertical-align: top; width: 40%;">
+          <div style=\"width: 30px; height: 30px; border-radius: 50%; background: #43a047; margin: 0 auto 6px auto;\"></div>
+          <div style=\"font-size: 12px; color: #43a047; text-align: center; font-weight: bold; line-height: 1.3;\">Closed</div>
+        </td>
+      </tr>
+    </table>
   ` : `
-    <div style=\"display: flex; justify-content: center; align-items: center; margin: 32px 0 32px 0;\">
-      <div style=\"display: flex; flex-direction: column; align-items: center; margin-right: 8px;\">
-        <div style=\"width: 28px; height: 28px; border-radius: 50%; background: #1976d2; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: bold; margin-bottom: 4px;\"></div>
-        <div style=\"font-size: 12px; color: #1976d2; text-align: center; max-width: 180px; font-weight: bold;\">${firstLabel}</div>
-      </div>
-      <div style=\"width: 36px; height: 2px; background: #1976d2; margin-bottom: 18px;\"></div>
-      <div style=\"display: flex; flex-direction: column; align-items: center; margin-left: 8px;\">
-        <div style=\"width: 28px; height: 28px; border-radius: 50%; background: ${secondColor}; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: bold; margin-bottom: 4px;\"></div>
-        <div style=\"font-size: 12px; color: ${secondLabelColor}; text-align: center; max-width: 90px; font-weight: bold;\">${secondLabel}</div>
-      </div>
-    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 32px 0 32px 0;">
+      <tr>
+        <td align="center" style="padding: 0 5px; vertical-align: top; width: 40%;">
+          <div style=\"width: 30px; height: 30px; border-radius: 50%; background: #1976d2; margin: 0 auto 6px auto;\"></div>
+          <div style=\"font-size: 12px; color: #1976d2; text-align: center; font-weight: bold; line-height: 1.3;\">${firstLabel}</div>
+        </td>
+        <td align="center" style="width: 20%; padding: 0; vertical-align: middle;">
+          <div style=\"height: 2px; background: #1976d2; width: 100%; margin-bottom: 20px; /* Ajuste pour centrer verticalement avec les labels */\"></div>
+        </td>
+        <td align="center" style="padding: 0 5px; vertical-align: top; width: 40%;">
+          <div style=\"width: 30px; height: 30px; border-radius: 50%; background: ${secondColor}; margin: 0 auto 6px auto;\"></div>
+          <div style=\"font-size: 12px; color: ${secondLabelColor}; text-align: center; font-weight: bold; line-height: 1.3;\">${secondLabel}</div>
+        </td>
+      </tr>
+    </table>
   `;
   try {
     await transporter.sendMail({
@@ -72,9 +80,9 @@ async function sendNotificationEmail(to, subject, text, currentStatus) {
       html: `
         <div style=\"font-family: Arial, sans-serif; color: #222; background: #f7f7f7; padding: 24px;\">
           <div style=\"background: #fff; border-radius: 8px; max-width: 480px; margin: auto; box-shadow: 0 2px 8px #0001; padding: 32px 24px;\">
-            <div style=\"display: flex; align-items: flex-start; margin-bottom: 16px;\">
-              <img src=\"${logoUrl}\" alt=\"Bitrix Logo\" width=\"120\" height=\"60\" style=\"max-width: 120px; max-height: 60px; width: 120px; height: 60px; display: block; margin: 0 0 16px 0; float: left;\" />
-              <h2 style=\"color: #1976d2; margin: 0 0 0 16px; font-size: 1.5em; align-self: center; flex: 1; text-align: left;\">Bitrix IT Support</h2>
+            <div style=\"display: flex; align-items: center; margin-bottom: 16px;\">
+              <img src=\"${logoUrl}\" alt=\"Bitrix Logo\" width=\"80\" height=\"80\" style=\"max-width: 80px; max-height: 80px; width: 80px; height: 80px; display: block; margin: 0; border: 0;\" />
+              <h2 style=\"color: #1976d2; margin: 0 0 0 16px; font-size: 1.5em; flex: 1; text-align: left;\">Bitrix IT Support</h2>
             </div>
             ${progressBarHtml}
             <div style=\"font-size: 1.15em; color: #222; text-align: center; margin-bottom: 32px; margin-top: 24px;\">
@@ -586,94 +594,114 @@ router.post('/tickets/:id/progress', async (req, res) => {
 
 // Assigner un technicien à un ticket
 router.post('/tickets/:id/assign', async (req, res) => {
+  console.log(`[Assign] Attempting assign for ticket ${req.params.id}`);
   try {
-    const { Ticket, AdminUser } = getModels();
+    const { Ticket, AdminUser, Notification } = getModels(); // Ensure Notification is here
     
     const ticket = await Ticket.findById(req.params.id);
     const technician = await AdminUser.findById(req.body.technicianId);
     
-    if (!ticket || !technician) {
-      return res.status(404).json({ message: 'Ticket or technician not found' });
+    if (!ticket) {
+      console.error(`[Assign] Ticket ${req.params.id} not found.`);
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+    if (!technician) {
+      console.error(`[Assign] Technician ${req.body.technicianId} not found.`);
+      return res.status(404).json({ message: 'Technician not found' });
     }
     
     if (technician.role !== 'technician') {
+      console.warn(`[Assign] User ${technician._id} is not a technician.`);
       return res.status(400).json({ message: 'User is not a technician' });
     }
     
     ticket.technician = technician._id;
     ticket.status = 'in-progress';
+    console.log(`[Assign] Updating ticket ${ticket._id} status to in-progress and assigning tech ${technician._id}.`);
+    // Add a progress entry for the assignment
+    ticket.progress.push({
+        status: 'assigned',
+        description: `Assigned to technician ${technician.firstName} ${technician.lastName}`,
+        date: new Date(),
+        updatedBy: req.admin._id // Admin who performed the assignment
+    });
     await ticket.save();
     
     // --- Emit WebSocket Event & Create Notification --- 
     const ticketId = req.params.id;
-    const { Notification } = getModels(); // Add Notification model
 
     try {
+      console.log(`[Assign] Populating ticket ${ticketId} for notification/emit...`);
       const updatedTicket = await Ticket.findById(ticketId)
-        .populate('client', '_id firstName lastName email') // Populate client
+        .populate('client', '_id firstName lastName email') // Ensure email is populated
         .populate('comments.user', 'firstName lastName email') 
         .populate({
             path: 'technician',
             select: 'firstName lastName email',
-            model: AdminUser // Use AdminUser model
+            model: AdminUser
          })
         .lean();
 
-      if (updatedTicket) {
-        // Emit WebSocket first
-        if (req.io) {
-            // Include notification text in the payload
-            req.io.to(ticketId).emit('ticket:updated', { ...updatedTicket, notificationText });
-            console.log(`Emitted ticket:updated event to room ${ticketId} after assign`);
-        } else {
-            console.error('req.io not found in admin assign');
-        }
-        
-        // Create Notification for the client
-        if (updatedTicket.client && updatedTicket.client._id) {
-          const techName = updatedTicket.technician ? `${updatedTicket.technician.firstName} ${updatedTicket.technician.lastName}` : 'a technician';
-          let notificationText = `Ticket ${updatedTicket.title || 'untitled'} assigned to ${techName}`;
-          const notificationLink = `/tickets/${ticketId}`;
-          
-          await Notification.create({
-            userRef: updatedTicket.client._id,
-            userModel: 'User',
-            text: notificationText,
-            link: notificationLink
-          });
-          // Send email notification to client
-          if (updatedTicket.client.email) {
-            await sendNotificationEmail(
-              updatedTicket.client.email,
-              notificationText,
-              notificationText,
-              updatedTicket.status
-            );
-          }
-          console.log(`Created notification for client ${updatedTicket.client._id} about assignment.`);
-        } else {
-           console.warn(`Ticket ${ticketId} has no client assigned, cannot notify about assignment.`);
-        }
-        
-        // Optionally notify the assigned technician as well?
-        // if (updatedTicket.technician && updatedTicket.technician._id) {
-        //   await Notification.create({ userRef: updatedTicket.technician._id, userModel: 'AdminUser', text: `Vous avez été assigné au ticket...`, link: `/admin/tickets/${ticketId}` });
-        // }
-
-      } else {
-           console.error(`Failed to fetch updated ticket ${ticketId} after assignment save.`);
+      if (!updatedTicket) {
+         console.error(`[Assign] CRITICAL: Failed to fetch updated ticket ${ticketId} after assignment save.`);
+         // Still send response, but log critical error
+         return res.status(500).json(ticket.toObject()); 
       }
+      
+      // Prepare notification text FIRST
+      const techName = updatedTicket.technician ? `${updatedTicket.technician.firstName} ${updatedTicket.technician.lastName}` : 'a technician';
+      const notificationText = `Ticket ${updatedTicket.title || 'untitled'} assigned to ${techName}`;
+      console.log(`[Assign] Prepared notification text: "${notificationText}"`);
+
+      // Emit WebSocket first (include notification text)
+      if (req.io) {
+          req.io.to(ticketId).emit('ticket:updated', { ...updatedTicket, notificationText });
+          console.log(`[Assign] Emitted ticket:updated event to room ${ticketId}`);
+      } else {
+          console.error('[Assign] req.io not found');
+      }
+      
+      // Create Notification for the client
+      if (updatedTicket.client && updatedTicket.client._id) {
+        console.log(`[Assign] Client found (${updatedTicket.client._id}). Creating notification...`);
+        const notificationLink = `/tickets/${ticketId}`;
+        await Notification.create({
+          userRef: updatedTicket.client._id,
+          userModel: 'User',
+          text: notificationText, // Use the specific text
+          link: notificationLink
+        });
+        console.log(`[Assign] Notification created for client ${updatedTicket.client._id}.`);
+        
+        // Send email notification to client
+        if (updatedTicket.client.email) {
+          console.log(`[Assign] Client email found (${updatedTicket.client.email}). Sending email...`);
+          await sendNotificationEmail(
+            updatedTicket.client.email,
+            notificationText,
+            notificationText,
+            updatedTicket.status
+          );
+        } else {
+          console.warn(`[Assign] Client email not found for client ${updatedTicket.client._id}. Cannot send email.`);
+        }
+      } else {
+         console.warn(`[Assign] Ticket ${ticketId} has no client assigned, cannot notify.`);
+      }
+      
       // Send response
-      res.json(updatedTicket || ticket.toObject());
+      console.log(`[Assign] Sending success response for ticket ${ticketId}.`);
+      res.json(updatedTicket);
 
     } catch(error) {
-        console.error('Error during notification/emit after assignment:', error);
-        res.status(500).json(ticket.toObject()); // Fallback response
+        console.error('[Assign] Error during notification/emit stage:', error);
+        // Fallback response even if notification fails
+        res.status(500).json(ticket.toObject()); 
     }
     // --- End Emit & Create ---
 
   } catch (error) {
-    console.error('Error assigning technician for admin:', error);
+    console.error('[Assign] Top-level error assigning technician:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
@@ -870,17 +898,17 @@ router.post('/tickets/:id/close', async (req, res) => {
 // Récupérer les données sensibles d'un client
 router.get('/client-data/:clientId', async (req, res) => {
   try {
-    const { ClientSensitiveData } = getModels();
+    const { CompanySensitiveData } = getModels(); // Renamed
     
-    const clientData = await ClientSensitiveData.findOne({
+    const companyData = await CompanySensitiveData.findOne({ // Renamed
       clientId: req.params.clientId
     });
 
-    if (!clientData) {
+    if (!companyData) {
       return res.status(404).json({ message: 'Data not found' });
     }
 
-    res.json(clientData.getDecryptedData());
+    res.json(companyData.getDecryptedData());
   } catch (error) {
     res.status(500).json({ message: 'Erreur serveur' });
   }
@@ -889,15 +917,15 @@ router.get('/client-data/:clientId', async (req, res) => {
 // Créer/Mettre à jour les données sensibles d'un client
 router.post('/client-data/:clientId', async (req, res) => {
   try {
-    const { ClientSensitiveData } = getModels();
+    const { CompanySensitiveData } = getModels(); // Renamed
     
-    const clientData = await ClientSensitiveData.findOneAndUpdate(
+    const companyData = await CompanySensitiveData.findOneAndUpdate( // Renamed
       { clientId: req.params.clientId },
       req.body,
       { new: true, upsert: true }
     );
 
-    res.json(clientData.getDecryptedData());
+    res.json(companyData.getDecryptedData());
   } catch (error) {
     res.status(500).json({ message: 'Erreur serveur' });
   }
@@ -1245,5 +1273,94 @@ router.delete('/clients/:clientId', async (req, res) => {
 });
 
 // --- END CLIENT CRUD ---
+
+// POST /api/admin/companies - Create a new company entry (INCHANGÉ)
+router.post('/companies', async (req, res) => {
+    const { companyName } = req.body;
+    console.log(`[Admin Companies POST] Received request to create company: ${companyName}`); // Log 1: Entrée dans la route
+
+    if (!companyName || typeof companyName !== 'string' || companyName.trim() === '') {
+        console.log('[Admin Companies POST] Validation failed: Company name missing or invalid.');
+        return res.status(400).json({ message: 'Company name is required and must be a non-empty string.' });
+    }
+
+    const trimmedCompanyName = companyName.trim();
+    console.log(`[Admin Companies POST] Trimmed name: ${trimmedCompanyName}`); // Log 2: Nom traité
+
+    try {
+        console.log('[Admin Companies POST] Getting models...'); // Log 3: Avant getModels
+        const { CompanySensitiveData } = getModels();
+        console.log('[Admin Companies POST] Models retrieved. Checking for existing company...'); // Log 4: Avant findOne
+
+        // Vérifie si une compagnie avec ce nom existe déjà
+        const existingCompany = await CompanySensitiveData.findOne({ companyName: trimmedCompanyName });
+        console.log('[Admin Companies POST] findOne completed. Existing company found:', existingCompany ? existingCompany._id : 'None'); // Log 5: Après findOne
+
+        if (existingCompany) {
+            console.log(`[Admin Companies POST] Company '${trimmedCompanyName}' already exists. Sending 409.`);
+            return res.status(409).json({ message: `Company '${trimmedCompanyName}' already exists.` });
+        }
+
+        console.log(`[Admin Companies POST] Creating new CompanySensitiveData instance for '${trimmedCompanyName}'...`); // Log 6: Avant new
+        const newCompanyEntry = new CompanySensitiveData({
+            companyName: trimmedCompanyName,
+        });
+        console.log('[Admin Companies POST] Instance created. Attempting to save...'); // Log 7: Avant save
+
+        await newCompanyEntry.save();
+        console.log(`[Admin Companies POST] Save successful for '${trimmedCompanyName}', id: ${newCompanyEntry._id}. Sending 201.`); // Log 8: Après save
+
+        res.status(201).json(newCompanyEntry.toJSON()); 
+
+    } catch (error) {
+        // Log d'erreur détaillé
+        console.error('[Admin Companies POST] Error caught in POST /companies:', error);
+        console.error('[Admin Companies POST] Error Name:', error.name);
+        console.error('[Admin Companies POST] Error Message:', error.message);
+        console.error('[Admin Companies POST] Error Stack:', error.stack);
+        
+        if (error.code === 11000) {
+             console.log('[Admin Companies POST] Duplicate key error (11000). Sending 409.')
+             return res.status(409).json({ message: 'A company with this identifier already exists.' });
+        }
+        console.log('[Admin Companies POST] Sending generic 500 error.');
+        res.status(500).json({ message: 'Server error creating company', error: error.message });
+    }
+});
+
+// GET /api/admin/companies-with-data - Fetch companies and their sensitive data (SIMPLIFIÉ)
+router.get('/companies-with-data', async (req, res) => {
+    console.log('[Admin Companies GET - Simple] Fetching companies from Sensitive Data only...');
+    try {
+        const { CompanySensitiveData } = getModels(); // Pas besoin de User ici
+
+        // 1. Get unique company names ONLY from CompanySensitiveData
+        const sensitiveDataCompanies = await CompanySensitiveData.distinct('companyName');
+        console.log(`[Admin Companies GET - Simple] Found ${sensitiveDataCompanies.length} unique company names from Sensitive Data.`);
+
+        const allCompanyNames = sensitiveDataCompanies.sort(); // Trie les noms trouvés
+
+        // 2. Fetch sensitive data for each company name
+        const companiesData = [];
+        for (const name of allCompanyNames) {
+            // Fetch associated sensitive data entries by companyName
+            const sensitiveDataEntries = await CompanySensitiveData.find({ companyName: name });
+            const sensitiveData = sensitiveDataEntries.map(entry => entry.toJSON()); // Applique les getters
+
+            companiesData.push({
+                name: name,
+                // users: [], // On ne retourne plus les utilisateurs
+                sensitiveData: sensitiveData // Retourne les données sensibles trouvées
+            });
+        }
+
+        console.log(`[Admin Companies GET - Simple] Processed data for ${companiesData.length} companies.`);
+        res.json(companiesData);
+
+    } catch (error) {
+        console.error('[Admin Companies GET - Simple] Error fetching companies data:', error);
+        res.status(500).json({ message: 'Server error fetching company data', error: error.message });
+    }
+});
 
 module.exports = router; 
