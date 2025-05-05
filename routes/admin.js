@@ -1363,4 +1363,66 @@ router.get('/companies-with-data', async (req, res) => {
     }
 });
 
+// GET /api/admin/companies/:companyName/diagram - Fetch diagram data for a company
+router.get('/companies/:companyName/diagram', async (req, res) => {
+    const { companyName } = req.params;
+    const decodedCompanyName = decodeURIComponent(companyName);
+    console.log(`[Admin Diagram GET] Fetching diagram for company: ${decodedCompanyName}`);
+
+    try {
+        const { CompanySensitiveData } = getModels();
+        // Trouve la première entrée correspondante (normalement une seule par nom)
+        const companyEntry = await CompanySensitiveData.findOne({ companyName: decodedCompanyName });
+
+        if (!companyEntry) {
+            console.log(`[Admin Diagram GET] Company not found: ${decodedCompanyName}`);
+            return res.status(404).json({ message: 'Company not found.' });
+        }
+
+        console.log(`[Admin Diagram GET] Diagram data found for ${decodedCompanyName}`);
+        // Retourne les données du diagramme (ou null si elles n'existent pas)
+        res.json(companyEntry.diagramData || { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }); // Retourne une structure vide par défaut
+
+    } catch (error) {
+        console.error(`[Admin Diagram GET] Error fetching diagram for ${decodedCompanyName}:`, error);
+        res.status(500).json({ message: 'Server error fetching diagram data', error: error.message });
+    }
+});
+
+// PUT /api/admin/companies/:companyName/diagram - Save/Update diagram data for a company
+router.put('/companies/:companyName/diagram', async (req, res) => {
+    const { companyName } = req.params;
+    const decodedCompanyName = decodeURIComponent(companyName);
+    const diagramData = req.body; // Attend l'objet JSON de React Flow { nodes, edges, viewport }
+    console.log(`[Admin Diagram PUT] Saving diagram for company: ${decodedCompanyName}`);
+
+    // Validation simple de la structure attendue
+    if (!diagramData || typeof diagramData !== 'object' || !Array.isArray(diagramData.nodes) || !Array.isArray(diagramData.edges) || typeof diagramData.viewport !== 'object') {
+        console.log('[Admin Diagram PUT] Invalid diagram data received.');
+        return res.status(400).json({ message: 'Invalid diagram data format. Expected { nodes: [], edges: [], viewport: {} }.' });
+    }
+
+    try {
+        const { CompanySensitiveData } = getModels();
+        // Trouve et met à jour l'entrée correspondante
+        const updatedCompanyEntry = await CompanySensitiveData.findOneAndUpdate(
+            { companyName: decodedCompanyName }, // Filtre
+            { $set: { diagramData: diagramData } }, // Mise à jour
+            { new: true } // Retourne le document mis à jour
+        );
+
+        if (!updatedCompanyEntry) {
+            console.log(`[Admin Diagram PUT] Company not found: ${decodedCompanyName}`);
+            return res.status(404).json({ message: 'Company not found.' });
+        }
+
+        console.log(`[Admin Diagram PUT] Diagram saved successfully for ${decodedCompanyName}`);
+        res.status(200).json({ message: 'Diagram saved successfully.', diagramData: updatedCompanyEntry.diagramData });
+
+    } catch (error) {
+        console.error(`[Admin Diagram PUT] Error saving diagram for ${decodedCompanyName}:`, error);
+        res.status(500).json({ message: 'Server error saving diagram data', error: error.message });
+    }
+});
+
 module.exports = router; 

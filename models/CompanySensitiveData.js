@@ -75,6 +75,10 @@ const companySensitiveDataSchema = new mongoose.Schema({
         subnetMask: { type: String, set: encrypt, get: decrypt },
         gateway: { type: String, set: encrypt, get: decrypt }
     },
+    diagramData: { // Ajout du champ pour les données React Flow
+        type: Object, // Stocke directement l'objet JSON de React Flow
+        default: null // Par défaut, pas de diagramme
+    },
     // Ajoute d'autres champs sensibles si nécessaire
 }, {
     timestamps: true,
