@@ -25,7 +25,9 @@ import AdminCreateTicket from './pages/AdminCreateTicket';
 import AdminCalendarView from './pages/AdminCalendarView';
 import AdminClientList from './pages/AdminClientList';
 import AdminCompanyList from './pages/AdminCompanyList';
-import AdminCompanyDetails from './pages/AdminCompanyDetails';
+import AdminCompanyPasswords from './pages/AdminCompanyPasswords';
+import AdminCompanyDiagram from './pages/AdminCompanyDiagram';
+import AdminCompanyRemoteAccess from './pages/AdminCompanyRemoteAccess';
 
 // Create theme
 const theme = createTheme({
@@ -242,7 +244,15 @@ function AppContent() {
         />
         <Route 
           path="admin/companies/:companyName"
-          element={<PrivateRoute roles={['admin', 'technician']}><AdminCompanyDetails /></PrivateRoute>}
+          element={<PrivateRoute roles={['admin', 'technician']}><AdminCompanyPasswords /></PrivateRoute>}
+        />
+        <Route 
+          path="admin/companies/:companyName/diagram"
+          element={<PrivateRoute roles={['admin', 'technician']}><AdminCompanyDiagram /></PrivateRoute>}
+        />
+        <Route 
+          path="admin/companies/:companyName/remote"
+          element={<PrivateRoute roles={['admin', 'technician']}><AdminCompanyRemoteAccess /></PrivateRoute>}
         />
       </Route>
     </Routes>

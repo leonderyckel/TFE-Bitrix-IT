@@ -8,6 +8,9 @@ import {
   TextField, Grid
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
+import SettingsRemoteIcon from '@mui/icons-material/SettingsRemote';
 import { useNavigate, Link } from 'react-router-dom';
 import * as yup from 'yup';
 import { useFormik } from 'formik';
@@ -196,27 +199,52 @@ const AdminCompanyList = () => {
                 companies.map((company) => (
                   <TableRow key={company.name}>
                     <TableCell component="th" scope="row">
-                      <Link 
-                        to={`/admin/companies/${encodeURIComponent(company.name)}`} 
-                        style={{ textDecoration: 'none', color: 'inherit', fontWeight: 500 }}
-                      >
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
                         {company.name}
-                      </Link>
+                      </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      {company.sensitiveData && company.sensitiveData.length > 0 ? (
-                        <Tooltip title="Sensitive data exists for this company">
-                          <span>
-                            <IconButton size="small" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-                              <span style={{fontSize: '0.8em'}}>✓</span>
-                            </IconButton>
-                          </span>
+                      {company.sensitiveData && company.sensitiveData.length > 0 && 
+                        company.sensitiveData.some(d => d.diagramData || d.credentials?.length > 0 || d.notes) ? (
+                        <Tooltip title="Sensitive data exists"> 
+                          <span><IconButton size="small" disabled style={{ opacity: 0.3, cursor: 'default' }}><span style={{fontSize: '0.8em'}}>✓</span></IconButton></span>
                         </Tooltip>
-                      ) : (
-                        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                          No data yet
-                        </Typography>
-                      )}
+                      ) : null}
+
+                      <Tooltip title="Stored Passwords">
+                        <IconButton 
+                          component={Link}
+                          to={`/admin/companies/${encodeURIComponent(company.name)}`} 
+                          size="small"
+                          color="secondary"
+                        >
+                          <VpnKeyIcon />
+                        </IconButton>
+                      </Tooltip>
+
+                      <Tooltip title="Remote Access">
+                        <IconButton 
+                          component={Link}
+                          to={`/admin/companies/${encodeURIComponent(company.name)}/remote`} 
+                          size="small"
+                          color="info"
+                          sx={{ ml: 1 }}
+                        >
+                          <SettingsRemoteIcon />
+                        </IconButton>
+                      </Tooltip>
+
+                      <Tooltip title="Network Diagram">
+                        <IconButton 
+                          component={Link}
+                          to={`/admin/companies/${encodeURIComponent(company.name)}/diagram`} 
+                          size="small"
+                          color="primary"
+                          sx={{ ml: 1 }}
+                        >
+                          <AccountTreeIcon />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))
