@@ -28,6 +28,7 @@ import AdminCompanyList from './pages/AdminCompanyList';
 import AdminCompanyPasswords from './pages/AdminCompanyPasswords';
 import AdminCompanyDiagram from './pages/AdminCompanyDiagram';
 import AdminCompanyRemoteAccess from './pages/AdminCompanyRemoteAccess';
+import AdminCompanyLayout from './pages/AdminCompanyLayout';
 
 // Create theme
 const theme = createTheme({
@@ -253,6 +254,10 @@ function AppContent() {
         <Route 
           path="admin/companies/:companyName/remote"
           element={<PrivateRoute roles={['admin', 'technician']}><AdminCompanyRemoteAccess /></PrivateRoute>}
+        />
+        <Route 
+          path="admin/companies/:companyName/layout"
+          element={<PrivateRoute roles={['admin', 'technician']}><AdminCompanyLayout /></PrivateRoute>}
         />
       </Route>
     </Routes>

@@ -1425,4 +1425,60 @@ router.put('/companies/:companyName/diagram', async (req, res) => {
     }
 });
 
+// GET /api/admin/companies/:companyName/layout - Fetch tldraw layout data
+router.get('/companies/:companyName/layout', async (req, res) => {
+    const { companyName } = req.params;
+    const decodedCompanyName = decodeURIComponent(companyName);
+    console.log(`[Admin Layout GET] Fetching layout for company: ${decodedCompanyName}`);
+
+    try {
+        const { CompanySensitiveData } = getModels();
+        const companyEntry = await CompanySensitiveData.findOne({ companyName: decodedCompanyName });
+
+        if (!companyEntry) {
+            return res.status(404).json({ message: 'Company not found.' });
+        }
+        
+        // Retourne les données layoutData (ou null)
+        res.json(companyEntry.layoutData || null); // tldraw gère bien l'état initial si null
+
+    } catch (error) {
+        console.error(`[Admin Layout GET] Error fetching layout for ${decodedCompanyName}:`, error);
+        res.status(500).json({ message: 'Server error fetching layout data', error: error.message });
+    }
+});
+
+// PUT /api/admin/companies/:companyName/layout - Save/Update tldraw layout data
+router.put('/companies/:companyName/layout', async (req, res) => {
+    const { companyName } = req.params;
+    const decodedCompanyName = decodeURIComponent(companyName);
+    const layoutData = req.body; // Attend le snapshot JSON de tldraw
+    console.log(`[Admin Layout PUT] Saving layout for company: ${decodedCompanyName}`);
+
+    // Validation très basique (juste vérifier que c'est un objet)
+    if (!layoutData || typeof layoutData !== 'object') {
+        return res.status(400).json({ message: 'Invalid layout data format. Expected tldraw snapshot object.' });
+    }
+
+    try {
+        const { CompanySensitiveData } = getModels();
+        const updatedCompanyEntry = await CompanySensitiveData.findOneAndUpdate(
+            { companyName: decodedCompanyName },
+            { $set: { layoutData: layoutData } }, // Met à jour layoutData
+            { new: true }
+        );
+
+        if (!updatedCompanyEntry) {
+            return res.status(404).json({ message: 'Company not found.' });
+        }
+
+        console.log(`[Admin Layout PUT] Layout saved successfully for ${decodedCompanyName}`);
+        res.status(200).json({ message: 'Layout saved successfully.' }); // Pas besoin de renvoyer les données
+
+    } catch (error) {
+        console.error(`[Admin Layout PUT] Error saving layout for ${decodedCompanyName}:`, error);
+        res.status(500).json({ message: 'Server error saving layout data', error: error.message });
+    }
+});
+
 module.exports = router; 

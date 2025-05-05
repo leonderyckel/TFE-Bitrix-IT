@@ -79,6 +79,10 @@ const companySensitiveDataSchema = new mongoose.Schema({
         type: Object, // Stocke directement l'objet JSON de React Flow
         default: null // Par défaut, pas de diagramme
     },
+    layoutData: { // Ajout du champ pour les données tldraw
+        type: Object, // Stocke directement le snapshot JSON de tldraw
+        default: null 
+    },
     // Ajoute d'autres champs sensibles si nécessaire
 }, {
     timestamps: true,

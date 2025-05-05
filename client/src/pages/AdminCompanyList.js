@@ -11,6 +11,7 @@ import AddIcon from '@mui/icons-material/Add';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import SettingsRemoteIcon from '@mui/icons-material/SettingsRemote';
+import LayersIcon from '@mui/icons-material/Layers';
 import { useNavigate, Link } from 'react-router-dom';
 import * as yup from 'yup';
 import { useFormik } from 'formik';
@@ -243,6 +244,18 @@ const AdminCompanyList = () => {
                           sx={{ ml: 1 }}
                         >
                           <AccountTreeIcon />
+                        </IconButton>
+                      </Tooltip>
+
+                      <Tooltip title="Floor Plan / Layout">
+                        <IconButton 
+                          component={Link}
+                          to={`/admin/companies/${encodeURIComponent(company.name)}/layout`} 
+                          size="small"
+                          color="success"
+                          sx={{ ml: 1 }}
+                        >
+                          <LayersIcon />
                         </IconButton>
                       </Tooltip>
                     </TableCell>
