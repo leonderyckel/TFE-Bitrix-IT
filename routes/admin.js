@@ -1481,4 +1481,102 @@ router.put('/companies/:companyName/layout', async (req, res) => {
     }
 });
 
+// GET /api/admin/companies/:companyName/credentials - Fetch all credentials for a company
+router.get('/companies/:companyName/credentials', async (req, res) => {
+    const { companyName } = req.params;
+    const decodedCompanyName = decodeURIComponent(companyName);
+    console.log(`[Admin Credentials GET] Fetching credentials for company: ${decodedCompanyName}`);
+
+    try {
+        const { CompanySensitiveData } = getModels();
+        const companyEntry = await CompanySensitiveData.findOne({ companyName: decodedCompanyName });
+
+        if (!companyEntry) {
+            console.log(`[Admin Credentials GET] Company not found: ${decodedCompanyName}`);
+            return res.json([]); // Return empty array if company or credentials don't exist
+        }
+
+        console.log(`[Admin Credentials GET] Credentials found for ${decodedCompanyName}`);
+        res.json(companyEntry.credentials || []); 
+    } catch (error) {
+        console.error(`[Admin Credentials GET] Error fetching credentials for ${decodedCompanyName}:`, error);
+        res.status(500).json({ message: 'Server error fetching credentials', error: error.message });
+    }
+});
+
+// POST /api/admin/companies/:companyName/credentials - Add a new credential for a company
+router.post('/companies/:companyName/credentials', async (req, res) => {
+    const { companyName } = req.params;
+    const decodedCompanyName = decodeURIComponent(companyName);
+    const { service, username, password } = req.body; // 'service' from frontend is 'title'
+
+    console.log(`[Admin Credentials POST] Adding credential for company: ${decodedCompanyName}`);
+
+    if (!service || !username || !password) {
+        return res.status(400).json({ message: 'Service (title), username, and password are required.' });
+    }
+
+    try {
+        const { CompanySensitiveData } = getModels();
+        let companyEntry = await CompanySensitiveData.findOne({ companyName: decodedCompanyName });
+
+        if (!companyEntry) {
+            console.log(`[Admin Credentials POST] Company not found: ${decodedCompanyName}. Cannot add credential.`);
+            return res.status(404).json({ message: 'Company sensitive data entry not found. Cannot add credential.' });
+        }
+
+        const newCredential = { service, username, password }; // Encryption handled by schema setters
+        companyEntry.credentials.push(newCredential);
+        
+        await companyEntry.save();
+        
+        const addedCredential = companyEntry.credentials[companyEntry.credentials.length - 1];
+
+        console.log(`[Admin Credentials POST] Credential added successfully for ${decodedCompanyName}`);
+        res.status(201).json(addedCredential.toJSON()); // Ensure getters are applied
+
+    } catch (error) {
+        console.error(`[Admin Credentials POST] Error adding credential for ${decodedCompanyName}:`, error);
+        res.status(500).json({ message: 'Server error adding credential', error: error.message });
+    }
+});
+
+// DELETE /api/admin/companies/:companyName/credentials/:credentialId - Delete a specific credential
+router.delete('/companies/:companyName/credentials/:credentialId', async (req, res) => {
+    const { companyName, credentialId } = req.params;
+    const decodedCompanyName = decodeURIComponent(companyName);
+
+    console.log(`[Admin Credentials DELETE] Deleting credential ${credentialId} for company: ${decodedCompanyName}`);
+
+    if (!mongoose.Types.ObjectId.isValid(credentialId)) {
+        return res.status(400).json({ message: 'Invalid credential ID format.' });
+    }
+
+    try {
+        const { CompanySensitiveData } = getModels();
+        const companyEntry = await CompanySensitiveData.findOne({ companyName: decodedCompanyName });
+
+        if (!companyEntry) {
+            console.log(`[Admin Credentials DELETE] Company not found: ${decodedCompanyName}`);
+            return res.status(404).json({ message: 'Company not found.' });
+        }
+
+        const credentialExists = companyEntry.credentials.some(cred => cred._id.toString() === credentialId);
+        if (!credentialExists) {
+            console.log(`[Admin Credentials DELETE] Credential ${credentialId} not found in company ${decodedCompanyName}`);
+            return res.status(404).json({ message: 'Credential not found.' });
+        }
+        
+        companyEntry.credentials.pull({ _id: credentialId });
+        await companyEntry.save();
+
+        console.log(`[Admin Credentials DELETE] Credential ${credentialId} deleted successfully for ${decodedCompanyName}`);
+        res.status(200).json({ message: 'Credential deleted successfully.' });
+
+    } catch (error) {
+        console.error(`[Admin Credentials DELETE] Error deleting credential for ${decodedCompanyName}:`, error);
+        res.status(500).json({ message: 'Server error deleting credential', error: error.message });
+    }
+});
+
 module.exports = router; 
