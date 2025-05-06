@@ -13,7 +13,11 @@ import {
     ListItemText,
     IconButton,
     CircularProgress,
-    Tooltip
+    Tooltip,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SettingsRemoteIcon from '@mui/icons-material/SettingsRemote';
@@ -28,6 +32,16 @@ import axios from 'axios';
 import { useSnackbar } from 'notistack';
 import API_URL from '../config/api';
 
+const accessTypes = [
+    { value: 'anydesk', label: 'AnyDesk' },
+    { value: 'rdp', label: 'RDP' },
+    { value: 'teamviewer', label: 'TeamViewer' },
+    { value: 'ssh', label: 'SSH' },
+    { value: 'vnc', label: 'VNC' },
+    { value: 'web', label: 'Web Link' },
+    { value: 'other', label: 'Other/Manual' },
+];
+
 const AdminCompanyRemoteAccess = () => {
     const { companyName } = useParams();
     const navigate = useNavigate();
@@ -36,10 +50,10 @@ const AdminCompanyRemoteAccess = () => {
 
     const [remoteAccesses, setRemoteAccesses] = useState([]);
     const [showAddForm, setShowAddForm] = useState(false);
-    const [newRemoteAccess, setNewRemoteAccess] = useState({ title: '', identifier: '', password: '', notes: '' });
+    const [newRemoteAccess, setNewRemoteAccess] = useState({ title: '', accessType: 'other', identifier: '', password: '', notes: '' });
     const [loading, setLoading] = useState(true);
     const [formSubmitting, setFormSubmitting] = useState(false);
-    const [visibleDetails, setVisibleDetails] = useState({}); // Store visibility state for id and password of each item
+    const [visibleDetails, setVisibleDetails] = useState({});
 
     const getToken = () => localStorage.getItem('token');
 
@@ -70,11 +84,33 @@ const AdminCompanyRemoteAccess = () => {
         setNewRemoteAccess(prev => ({ ...prev, [name]: value }));
     };
 
+    const handleSelectChange = (event) => {
+        setNewRemoteAccess(prev => ({ ...prev, accessType: event.target.value }));
+    };
+
     const handleAddRemoteAccess = async () => {
         if (!newRemoteAccess.title || !newRemoteAccess.identifier) {
             enqueueSnackbar('Please fill in Title and Identifier.', { variant: 'warning' });
             return;
         }
+        if (['anydesk', 'rdp', 'teamviewer', 'ssh', 'vnc'].includes(newRemoteAccess.accessType) && !newRemoteAccess.identifier) {
+            enqueueSnackbar(`Identifier is required for ${accessTypes.find(at => at.value === newRemoteAccess.accessType)?.label || 'this access type'}.`, { variant: 'warning' });
+            return;
+        }
+        if (newRemoteAccess.accessType === 'web') {
+            try {
+                let urlToCheck = newRemoteAccess.identifier;
+                if (!urlToCheck.startsWith('http://') && !urlToCheck.startsWith('https://')) {
+                    new URL('http://' + urlToCheck);
+                } else {
+                    new URL(urlToCheck);
+                }
+            } catch (_) {
+                enqueueSnackbar('Please enter a valid URL for Web Link type (e.g., http://example.com or example.com).', { variant: 'warning' });
+                return;
+            }
+        }
+
         setFormSubmitting(true);
         try {
             const token = getToken();
@@ -85,7 +121,7 @@ const AdminCompanyRemoteAccess = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setRemoteAccesses(prev => [...prev, addedAccess]);
-            setNewRemoteAccess({ title: '', identifier: '', password: '', notes: '' });
+            setNewRemoteAccess({ title: '', accessType: 'other', identifier: '', password: '', notes: '' });
             setShowAddForm(false);
             enqueueSnackbar('Remote access configuration added successfully!', { variant: 'success' });
         } catch (error) {
@@ -111,12 +147,12 @@ const AdminCompanyRemoteAccess = () => {
         }
     };
 
-    const toggleDetailVisibility = (id, field) => { // field can be 'identifier' or 'password'
+    const toggleDetailVisibility = (id, field) => {
         setVisibleDetails(prev => ({
             ...prev,
             [id]: {
                 ...prev[id],
-                [field]: !prev[id]?.[field] // Toggle specific field visibility
+                [field]: !prev[id]?.[field]
             }
         }));
     };
@@ -153,7 +189,33 @@ const AdminCompanyRemoteAccess = () => {
                 <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
                     <Typography variant="h6" gutterBottom>Add New Remote Access</Typography>
                     <TextField label="Title (e.g., TeamViewer PC, VPN Office)" name="title" value={newRemoteAccess.title} onChange={handleInputChange} fullWidth margin="normal" disabled={formSubmitting} />
-                    <TextField label="Identifier (e.g., ID, Username, IP)" name="identifier" value={newRemoteAccess.identifier} onChange={handleInputChange} fullWidth margin="normal" disabled={formSubmitting} />
+                    
+                    <FormControl fullWidth margin="normal" disabled={formSubmitting}>
+                        <InputLabel id="access-type-label">Access Type</InputLabel>
+                        <Select
+                            labelId="access-type-label"
+                            name="accessType"
+                            value={newRemoteAccess.accessType}
+                            label="Access Type"
+                            onChange={handleSelectChange}
+                        >
+                            {accessTypes.map((type) => (
+                                <MenuItem key={type.value} value={type.value}>
+                                    {type.label}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                    
+                    <TextField 
+                        label={newRemoteAccess.accessType === 'web' ? "URL (e.g., https://example.com)" : "Identifier (e.g., ID, Username, IP)"} 
+                        name="identifier" 
+                        value={newRemoteAccess.identifier} 
+                        onChange={handleInputChange} 
+                        fullWidth 
+                        margin="normal" 
+                        disabled={formSubmitting} 
+                    />
                     <TextField label="Password (Optional)" name="password" type="password" value={newRemoteAccess.password} onChange={handleInputChange} fullWidth margin="normal" disabled={formSubmitting} />
                     <TextField label="Notes (Optional)" name="notes" value={newRemoteAccess.notes} onChange={handleInputChange} fullWidth margin="normal" multiline rows={3} disabled={formSubmitting} />
                     <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
@@ -173,38 +235,88 @@ const AdminCompanyRemoteAccess = () => {
                     <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', my: 3, p: 2 }}>No remote access configurations stored yet.</Typography>
                 ) : (
                     <List disablePadding>
-                        {remoteAccesses.map((ra) => (
+                        {remoteAccesses.map((ra) => {
+                            const typeLabel = accessTypes.find(at => at.value === ra.accessType)?.label || 'Other';
+                            let identifierDisplay;
+                            const displayedIdentifier = visibleDetails[ra._id]?.identifier ? (ra.identifier || "(empty)") : '••••••••';
+                            
+                            if (ra.identifier) {
+                                if (ra.accessType === 'anydesk') {
+                                    identifierDisplay = (
+                                        <Button 
+                                            component="a" 
+                                            href={`anydesk:${ra.identifier}`}
+                                            sx={{ p: 0, textTransform: 'none', minWidth: 0, justifyContent: 'flex-start', fontWeight: 'normal' }}
+                                        >
+                                            {displayedIdentifier}
+                                        </Button>
+                                    );
+                                } else if (ra.accessType === 'web') {
+                                    const clickableUrl = ra.identifier.startsWith('http://') || ra.identifier.startsWith('https://') 
+                                                        ? ra.identifier 
+                                                        : `http://${ra.identifier}`;
+                                    identifierDisplay = (
+                                        <Button 
+                                            component="a" 
+                                            href={clickableUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            sx={{ p: 0, textTransform: 'none', minWidth: 0, justifyContent: 'flex-start', fontWeight: 'normal' }}
+                                        >
+                                           {displayedIdentifier}
+                                        </Button>
+                                    );
+                                } else {
+                                    identifierDisplay = (
+                                        <Typography component="span" variant="body2" sx={{ wordBreak: 'break-all' }}>
+                                            {displayedIdentifier}
+                                        </Typography>
+                                    );
+                                }
+                            } else {
+                                identifierDisplay = <Typography component="span" variant="body2" color="text.disabled">(empty)</Typography>;
+                            }
+
+                            return (
                             <React.Fragment key={ra._id}>
                                 <ListItem sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', py: 1.5, px: { xs: 1, sm: 2 } }}>
                                     <ListItemText
-                                        primary={ra.title || "(No Title)"}
-                                        secondaryTypographyProps={{ component: 'div' }} // Permet aux éléments de Box d'être rendus correctement
+                                        primary={`${ra.title || "(No Title)"} (${typeLabel})`}
+                                        secondaryTypographyProps={{ component: 'div' }}
                                         secondary={
                                             <Box sx={{ mt: 0.5 }}>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5, minHeight: '24px' }}>
                                                     <Typography component="span" variant="body2" sx={{ minWidth: '80px', fontWeight: 'medium', color: 'text.secondary' }}>ID:</Typography>
-                                                    <Typography component="span" variant="body2" sx={{ mr: 1, wordBreak: 'break-all' }}>
-                                                        {visibleDetails[ra._id]?.identifier ? (ra.identifier || "(empty)") : '••••••••'}
-                                                    </Typography>
-                                                    <IconButton onClick={() => copyToClipboard(ra.identifier, "Identifier")} size="small" aria-label="copy identifier" sx={{ p: 0.5 }}><ContentCopyIcon fontSize="inherit" /></IconButton>
-                                                    <IconButton onClick={() => toggleDetailVisibility(ra._id, 'identifier')} size="small" aria-label="toggle identifier visibility" sx={{ p: 0.5 }}>
-                                                        {visibleDetails[ra._id]?.identifier ? <VisibilityOff fontSize="inherit" /> : <Visibility fontSize="inherit" />}
-                                                    </IconButton>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap'}}>
+                                                        {identifierDisplay}
+                                                        {ra.identifier && (
+                                                            <Box component="span" sx={{ display: 'inline-flex', ml: 0.5 }}>
+                                                                <IconButton onClick={() => copyToClipboard(ra.identifier, "Identifier")} size="small" aria-label="copy identifier" sx={{ p: 0.5 }}><ContentCopyIcon fontSize="inherit" /></IconButton>
+                                                                <IconButton onClick={() => toggleDetailVisibility(ra._id, 'identifier')} size="small" aria-label="toggle identifier visibility" sx={{ p: 0.5 }}>
+                                                                    {visibleDetails[ra._id]?.identifier ? <VisibilityOff fontSize="inherit" /> : <Visibility fontSize="inherit" />}
+                                                                </IconButton>
+                                                            </Box>
+                                                        )}
+                                                    </Box>
                                                 </Box>
                                                 {ra.password && (
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: ra.notes ? 0.5 : 0 }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: ra.notes ? 0.5 : 0, minHeight: '24px' }}>
                                                         <Typography component="span" variant="body2" sx={{ minWidth: '80px', fontWeight: 'medium', color: 'text.secondary' }}>Pass:</Typography>
-                                                        <Typography component="span" variant="body2" sx={{ mr: 1, wordBreak: 'break-all' }}>
-                                                            {visibleDetails[ra._id]?.password ? (ra.password || "(empty)") : '••••••••'}
-                                                        </Typography>
-                                                        <IconButton onClick={() => copyToClipboard(ra.password, "Password")} size="small" aria-label="copy password" sx={{ p: 0.5 }}><ContentCopyIcon fontSize="inherit" /></IconButton>
-                                                        <IconButton onClick={() => toggleDetailVisibility(ra._id, 'password')} size="small" aria-label="toggle password visibility" sx={{ p: 0.5 }}>
-                                                            {visibleDetails[ra._id]?.password ? <VisibilityOff fontSize="inherit" /> : <Visibility fontSize="inherit" />}
-                                                        </IconButton>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap'}}>
+                                                            <Typography component="span" variant="body2" sx={{ mr: 0.5, wordBreak: 'break-all' }}>
+                                                                {visibleDetails[ra._id]?.password ? (ra.password || "(empty)") : '••••••••'}
+                                                            </Typography>
+                                                            <Box component="span" sx={{ display: 'inline-flex', ml: 0 }}>
+                                                                <IconButton onClick={() => copyToClipboard(ra.password, "Password")} size="small" aria-label="copy password" sx={{ p: 0.5 }}><ContentCopyIcon fontSize="inherit" /></IconButton>
+                                                                <IconButton onClick={() => toggleDetailVisibility(ra._id, 'password')} size="small" aria-label="toggle password visibility" sx={{ p: 0.5 }}>
+                                                                    {visibleDetails[ra._id]?.password ? <VisibilityOff fontSize="inherit" /> : <Visibility fontSize="inherit" />}
+                                                                </IconButton>
+                                                            </Box>
+                                                        </Box>
                                                     </Box>
                                                 )}
                                                 {ra.notes && (
-                                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', mt: 0.5 }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', mt: 1 }}>
                                                         <NotesIcon fontSize="small" sx={{ color: 'text.secondary', mr: 0.8, mt: '3px' }}/>
                                                         <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{ra.notes}</Typography>
                                                     </Box>
@@ -213,7 +325,7 @@ const AdminCompanyRemoteAccess = () => {
                                         }
                                         sx={{ wordBreak: 'break-word', mr: 1, flexGrow: 1, mb: { xs: 1, sm: 0 } }}
                                     />
-                                    <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, mt: { xs: 1, md: 0 } }}>
+                                     <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, mt: { xs: 1, md: 0 } }}>
                                         <IconButton aria-label="delete" onClick={() => handleDeleteRemoteAccess(ra._id)} size="small" color="error" sx={{ p: 0.5 }}>
                                             <DeleteIcon fontSize="inherit" />
                                         </IconButton>
@@ -221,7 +333,7 @@ const AdminCompanyRemoteAccess = () => {
                                 </ListItem>
                                 <Divider component="li" />
                             </React.Fragment>
-                        ))}
+                        );})}
                     </List>
                 )}
             </Paper>

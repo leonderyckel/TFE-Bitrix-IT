@@ -1606,11 +1606,11 @@ router.get('/companies/:companyName/remote-access', async (req, res) => {
 router.post('/companies/:companyName/remote-access', async (req, res) => {
     const { companyName } = req.params;
     const decodedCompanyName = decodeURIComponent(companyName);
-    const { title, identifier, password, notes } = req.body;
+    // AJOUTER accessType à la déstructuration
+    const { title, identifier, password, notes, accessType } = req.body;
 
     console.log(`[Admin RemoteAccess POST] Adding remote access detail for company: ${decodedCompanyName}`);
 
-    // MODIFICATION ICI: Le mot de passe n'est plus requis
     if (!title || !identifier) { 
         return res.status(400).json({ message: 'Title and Identifier are required for remote access details.' });
     }
@@ -1626,9 +1626,10 @@ router.post('/companies/:companyName/remote-access', async (req, res) => {
 
         const newRemoteAccess = {
             title,
-            identifier, // Sera crypté par le setter
-            password,   // Sera crypté par le setter
-            notes       // Sera crypté par le setter (si non null)
+            accessType: accessType || 'other', // S'assurer qu'il y a une valeur par défaut si non fournie
+            identifier, 
+            password,   
+            notes       
         };
         companyEntry.remoteAccessDetails.push(newRemoteAccess);
         

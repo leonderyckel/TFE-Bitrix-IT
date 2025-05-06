@@ -118,6 +118,7 @@ const companySensitiveDataSchema = new mongoose.Schema({
     remoteAccessDetails: [
         {
             title: String,
+            accessType: { type: String, default: 'other' },
             identifier: { type: String, set: encrypt, get: decrypt },
             password: { type: String, set: encrypt, get: decrypt },
             notes: { type: String, set: encrypt, get: decrypt, default: null }
@@ -175,6 +176,7 @@ companySensitiveDataSchema.methods.getDecryptedData = function() {
         decrypted.remoteAccessDetails = this.remoteAccessDetails.map(access => ({
             _id: access._id,
             title: access.title,
+            accessType: access.accessType,
             identifier: access.identifier,
             password: access.password,
             notes: access.notes
