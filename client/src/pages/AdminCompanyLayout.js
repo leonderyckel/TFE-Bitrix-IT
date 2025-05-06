@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
     Container, 
@@ -6,27 +6,134 @@ import {
     Box, 
     CircularProgress, 
     Alert, 
-    Button 
+    Button,
+    Grid
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SaveIcon from '@mui/icons-material/Save';
 import axios from 'axios';
 import API_URL from '../config/api';
 import { 
     Tldraw, 
     useEditor, 
-    loadSnapshot // Importe la nouvelle fonction
-} from '@tldraw/tldraw'; // Import tldraw
-import '@tldraw/tldraw/tldraw.css'; // Import styles tldraw
+    loadSnapshot,
+    createShapeId,
+    DefaultToolbar,
+    DefaultToolbarContent,
+    TLUiOverrides,
+    TLComponents,
+    TLUiAssetUrlOverrides,
+    TldrawUiMenuItem,
+    useTools,
+    useIsToolSelected
+} from '@tldraw/tldraw';
+import '@tldraw/tldraw/tldraw.css';
 import { useSnackbar } from 'notistack';
+import { PrinterTool } from '../components/tldrawTools/PrinterTool';
+import { ServerTool } from '../components/tldrawTools/ServerTool';
+import { ComputerTool } from '../components/tldrawTools/ComputerTool';
+import { DesktopTool } from '../components/tldrawTools/DesktopTool';
+import { PhoneTool } from '../components/tldrawTools/PhoneTool';
+import { CableTool } from '../components/tldrawTools/CableTool';
 
-// Composant interne pour gérer l'éditeur et le bouton Save
+// [1] Définition des overrides pour ajouter les outils au contexte
+const uiOverrides = {
+	tools(editor, tools) {
+		tools.printer = {
+			id: 'printer',
+			icon: 'printer-tool-icon', // Référence à l'icône définie dans customAssetUrls
+			label: 'Printer',
+			kbd: 'p',
+			onSelect: () => { editor.setCurrentTool('printer') },
+		};
+        tools.server = {
+			id: 'server',
+			icon: 'server-tool-icon',
+			label: 'Server',
+			kbd: 's', // Attention: peut entrer en conflit avec 'select'
+			onSelect: () => { editor.setCurrentTool('server') },
+		};
+        tools.computer = {
+			id: 'computer',
+			icon: 'computer-tool-icon',
+			label: 'Laptop',
+			kbd: 'l', // Change kbd pour éviter conflit
+			onSelect: () => { editor.setCurrentTool('computer') },
+		};
+        tools.desktop = {
+			id: 'desktop',
+			icon: 'desktop-tool-icon',
+			label: 'Desktop',
+			kbd: 'd',
+			onSelect: () => { editor.setCurrentTool('desktop') },
+		};
+        tools.phone = {
+			id: 'phone',
+			icon: 'phone-tool-icon',
+			label: 'Phone',
+			kbd: 'h',
+			onSelect: () => { editor.setCurrentTool('phone') },
+		};
+        tools.cable = {
+			id: 'cable',
+			icon: 'cable-tool-icon',
+			label: 'Cable',
+			kbd: 'e',
+			onSelect: () => { editor.setCurrentTool('cable') },
+		};
+		return tools;
+	},
+};
+
+// [2] Surcharge du composant Toolbar pour ajouter les boutons
+const components = {
+	Toolbar: (props) => {
+		const tools = useTools();
+        // Crée des états pour chaque outil
+		const isPrinterSelected = useIsToolSelected(tools.printer);
+        const isServerSelected = useIsToolSelected(tools.server);
+        const isComputerSelected = useIsToolSelected(tools.computer);
+        const isDesktopSelected = useIsToolSelected(tools.desktop);
+        const isPhoneSelected = useIsToolSelected(tools.phone);
+        const isCableSelected = useIsToolSelected(tools.cable);
+		return (
+			<DefaultToolbar {...props}>
+                 {/* Contenu par défaut de la toolbar */}
+				<DefaultToolbarContent />
+                {/* Ajoute nos boutons personnalisés après le contenu par défaut */}
+				<TldrawUiMenuItem {...tools.printer} isSelected={isPrinterSelected} />
+                <TldrawUiMenuItem {...tools.server} isSelected={isServerSelected} />
+                <TldrawUiMenuItem {...tools.computer} isSelected={isComputerSelected} />
+                <TldrawUiMenuItem {...tools.desktop} isSelected={isDesktopSelected} />
+                <TldrawUiMenuItem {...tools.phone} isSelected={isPhoneSelected} />
+                <TldrawUiMenuItem {...tools.cable} isSelected={isCableSelected} />
+			</DefaultToolbar>
+		);
+	},
+    // On pourrait aussi surcharger KeyboardShortcutsDialog ici si besoin
+};
+
+// [3] URLs des icônes : Utilise les URLs directes des SVG Lucide depuis unpkg
+const customAssetUrls = {
+	icons: {
+        // Utilise les noms d'icônes de lucide-static
+		'printer-tool-icon': 'https://unpkg.com/lucide-static@latest/icons/printer.svg', 
+        'server-tool-icon': 'https://unpkg.com/lucide-static@latest/icons/server.svg',
+        'computer-tool-icon': 'https://unpkg.com/lucide-static@latest/icons/laptop.svg',
+        'desktop-tool-icon': 'https://unpkg.com/lucide-static@latest/icons/monitor.svg',
+        'phone-tool-icon': 'https://unpkg.com/lucide-static@latest/icons/smartphone.svg',
+        'cable-tool-icon': 'https://unpkg.com/lucide-static@latest/icons/plug-zap.svg',
+	},
+};
+
+// [4] Tableau des classes d'outils personnalisés
+const customTools = [PrinterTool, ServerTool, ComputerTool, DesktopTool, PhoneTool, CableTool];
+
+// Composant interne TldrawEditor (simplifié, plus besoin de gérer onDrop/onDragOver)
 const TldrawEditor = ({ initialSnapshot, companyName }) => {
-    const editorRef = useRef(null); // Pour stocker l'instance de l'éditeur
+    const editorRef = useRef(null);
     const { enqueueSnackbar } = useSnackbar();
     const [isSaving, setIsSaving] = useState(false);
 
-    // Fonction pour stocker l'instance de l'éditeur une fois montée
     const handleMount = (editor) => {
         editorRef.current = editor;
         // Charge le snapshot initial s'il existe
@@ -42,7 +149,6 @@ const TldrawEditor = ({ initialSnapshot, companyName }) => {
         }
     };
 
-    // Fonction pour sauvegarder le snapshot actuel
     const handleSaveLayout = async () => {
         if (!editorRef.current) return;
         setIsSaving(true);
@@ -63,32 +169,33 @@ const TldrawEditor = ({ initialSnapshot, companyName }) => {
     };
 
     return (
-        <> 
-            {/* Bouton Save spécifique à tldraw */} 
-            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+        <Box sx={{ height: '75vh', display: 'flex', flexDirection: 'column' }}>
+             <Box sx={{ mb: 1, display: 'flex', justifyContent: 'flex-end' }}>
                  <Button
                     variant="contained"
                     color="primary"
-                    startIcon={<SaveIcon />}
                     onClick={handleSaveLayout}
                     disabled={isSaving}
                 >
                     {isSaving ? <CircularProgress size={24} color="inherit" /> : 'Save Layout'}
                 </Button>
-            </Box>
-            {/* Conteneur tldraw avec hauteur fixe */} 
-            <Box style={{ position: 'relative', height: '75vh', border: '1px solid #eee' }}>
+             </Box>
+             <Box style={{ position: 'relative', flexGrow: 1, border: '1px solid #eee' }}>
                 <Tldraw 
-                    persistenceKey={`tldraw_layout_${companyName}`} // Clé unique pour état local (optionnel)
+                    persistenceKey={`tldraw_layout_${companyName}`}
                     onMount={handleMount} 
-                    userInteractionPriority="high"
+                    userInteractionPriority="high" 
+                    tools={customTools}
+                    overrides={uiOverrides}
+                    components={components}
+                    assetUrls={customAssetUrls}
                 />
-            </Box>
-        </>
+             </Box>
+        </Box>
     );
 }
 
-// Composant principal de la page Layout
+// Composant principal de la page Layout (layout Grid retiré)
 const AdminCompanyLayout = () => {
     const { companyName } = useParams();
     const navigate = useNavigate();
@@ -131,8 +238,9 @@ const AdminCompanyLayout = () => {
     const decodedCompanyName = decodeURIComponent(companyName || '');
 
     return (
-        <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <Container maxWidth="xl" sx={{ mt: 4, mb: 4, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px - 32px)' }}> 
+            {/* Header de la page (Titre + Bouton Retour) */}
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <Button 
                     startIcon={<ArrowBackIcon />} 
                     onClick={() => navigate('/admin/companies')} 
@@ -148,7 +256,7 @@ const AdminCompanyLayout = () => {
             {loading && ( <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}><CircularProgress /></Box> )}
             {error && ( <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert> )}
             
-            {/* Affiche tldraw une fois le chargement terminé (même si data est null) */} 
+            {/* Affiche directement TldrawEditor (plus de Grid ni Sidebar) */}
             {!loading && (
                  <TldrawEditor 
                     initialSnapshot={initialLayoutData} 
