@@ -1,14 +1,13 @@
+const dotenv = require('dotenv');
+dotenv.config(); // Load environment variables FIRST
+
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const path = require('path');
 const { initializeModels } = require('./models');
 // Import http and socket.io
 const http = require('http');
 const { Server } = require("socket.io");
-
-// Load environment variables
-dotenv.config();
 
 // Initialize Express app
 const app = express();
