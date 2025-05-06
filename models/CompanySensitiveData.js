@@ -115,6 +115,14 @@ const companySensitiveDataSchema = new mongoose.Schema({
             //_id: false // Si vous ne voulez pas d'_id pour les sous-documents credentials
         }
     ],
+    remoteAccessDetails: [
+        {
+            title: String,
+            identifier: { type: String, set: encrypt, get: decrypt },
+            password: { type: String, set: encrypt, get: decrypt },
+            notes: { type: String, set: encrypt, get: decrypt, default: null }
+        }
+    ],
     networkInfo: {
         ipAddress: { type: String, set: encrypt, get: decrypt },
         subnetMask: { type: String, set: encrypt, get: decrypt },
@@ -157,14 +165,23 @@ companySensitiveDataSchema.methods.getDecryptedData = function() {
     }
     if (this.credentials && this.credentials.length > 0) {
         decrypted.credentials = this.credentials.map(cred => ({
-            _id: cred._id, // Conserver l'_id du sous-document
+            _id: cred._id,
             service: cred.service,
-            username: cred.username, // Getter devrait s'appliquer
-            password: cred.password  // Getter devrait s'appliquer
+            username: cred.username,
+            password: cred.password
         }));
     }
-    if (this.diagramData) decrypted.diagramData = this.diagramData; // Non crypté
-    if (this.layoutData) decrypted.layoutData = this.layoutData; // Non crypté
+    if (this.remoteAccessDetails && this.remoteAccessDetails.length > 0) {
+        decrypted.remoteAccessDetails = this.remoteAccessDetails.map(access => ({
+            _id: access._id,
+            title: access.title,
+            identifier: access.identifier,
+            password: access.password,
+            notes: access.notes
+        }));
+    }
+    if (this.diagramData) decrypted.diagramData = this.diagramData;
+    if (this.layoutData) decrypted.layoutData = this.layoutData;
 
     decrypted.createdAt = this.createdAt;
     decrypted.updatedAt = this.updatedAt;

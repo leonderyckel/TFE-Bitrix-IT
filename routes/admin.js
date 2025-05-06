@@ -1579,4 +1579,109 @@ router.delete('/companies/:companyName/credentials/:credentialId', async (req, r
     }
 });
 
+// GET /api/admin/companies/:companyName/remote-access - Fetch all remote access details for a company
+router.get('/companies/:companyName/remote-access', async (req, res) => {
+    const { companyName } = req.params;
+    const decodedCompanyName = decodeURIComponent(companyName);
+    console.log(`[Admin RemoteAccess GET] Fetching remote access details for company: ${decodedCompanyName}`);
+
+    try {
+        const { CompanySensitiveData } = getModels();
+        const companyEntry = await CompanySensitiveData.findOne({ companyName: decodedCompanyName });
+
+        if (!companyEntry || !companyEntry.remoteAccessDetails) {
+            console.log(`[Admin RemoteAccess GET] No remote access details found for: ${decodedCompanyName}`);
+            return res.json([]); 
+        }
+
+        console.log(`[Admin RemoteAccess GET] Remote access details found for ${decodedCompanyName}`);
+        res.json(companyEntry.remoteAccessDetails); // Getters s'appliquent grâce à toJSON dans le schéma
+    } catch (error) {
+        console.error(`[Admin RemoteAccess GET] Error fetching remote access details for ${decodedCompanyName}:`, error);
+        res.status(500).json({ message: 'Server error fetching remote access details', error: error.message });
+    }
+});
+
+// POST /api/admin/companies/:companyName/remote-access - Add a new remote access detail
+router.post('/companies/:companyName/remote-access', async (req, res) => {
+    const { companyName } = req.params;
+    const decodedCompanyName = decodeURIComponent(companyName);
+    const { title, identifier, password, notes } = req.body;
+
+    console.log(`[Admin RemoteAccess POST] Adding remote access detail for company: ${decodedCompanyName}`);
+
+    // MODIFICATION ICI: Le mot de passe n'est plus requis
+    if (!title || !identifier) { 
+        return res.status(400).json({ message: 'Title and Identifier are required for remote access details.' });
+    }
+
+    try {
+        const { CompanySensitiveData } = getModels();
+        let companyEntry = await CompanySensitiveData.findOne({ companyName: decodedCompanyName });
+
+        if (!companyEntry) {
+            console.log(`[Admin RemoteAccess POST] Company not found: ${decodedCompanyName}. Cannot add remote access detail.`);
+            return res.status(404).json({ message: 'Company sensitive data entry not found.' });
+        }
+
+        const newRemoteAccess = {
+            title,
+            identifier, // Sera crypté par le setter
+            password,   // Sera crypté par le setter
+            notes       // Sera crypté par le setter (si non null)
+        };
+        companyEntry.remoteAccessDetails.push(newRemoteAccess);
+        
+        await companyEntry.save();
+        
+        const addedRemoteAccess = companyEntry.remoteAccessDetails[companyEntry.remoteAccessDetails.length - 1];
+
+        console.log(`[Admin RemoteAccess POST] Remote access detail added successfully for ${decodedCompanyName}`);
+        res.status(201).json(addedRemoteAccess.toJSON()); // Assure que les getters sont appliqués
+
+    } catch (error) {
+        console.error(`[Admin RemoteAccess POST] Error adding remote access detail for ${decodedCompanyName}:`, error);
+        res.status(500).json({ message: 'Server error adding remote access detail', error: error.message });
+    }
+});
+
+// DELETE /api/admin/companies/:companyName/remote-access/:accessId - Delete a specific remote access detail
+router.delete('/companies/:companyName/remote-access/:accessId', async (req, res) => {
+    const { companyName, accessId } = req.params;
+    const decodedCompanyName = decodeURIComponent(companyName);
+
+    console.log(`[Admin RemoteAccess DELETE] Deleting remote access detail ${accessId} for company: ${decodedCompanyName}`);
+
+    if (!mongoose.Types.ObjectId.isValid(accessId)) {
+        return res.status(400).json({ message: 'Invalid remote access ID format.' });
+    }
+
+    try {
+        const { CompanySensitiveData } = getModels();
+        const companyEntry = await CompanySensitiveData.findOne({ companyName: decodedCompanyName });
+
+        if (!companyEntry || !companyEntry.remoteAccessDetails) {
+            console.log(`[Admin RemoteAccess DELETE] Company or remote access details not found for: ${decodedCompanyName}`);
+            return res.status(404).json({ message: 'Company or remote access details not found.' });
+        }
+
+        const initialCount = companyEntry.remoteAccessDetails.length;
+        companyEntry.remoteAccessDetails.pull({ _id: accessId });
+        
+        if (companyEntry.remoteAccessDetails.length === initialCount) {
+            console.log(`[Admin RemoteAccess DELETE] Remote access detail ${accessId} not found for company ${decodedCompanyName}`);
+            return res.status(404).json({ message: 'Remote access detail not found.' });
+        }
+        
+        await companyEntry.save();
+
+        console.log(`[Admin RemoteAccess DELETE] Remote access detail ${accessId} deleted successfully for ${decodedCompanyName}`);
+        res.status(200).json({ message: 'Remote access detail deleted successfully.' });
+
+    } catch (error) {
+        console.error(`[Admin RemoteAccess DELETE] Error deleting remote access detail for ${decodedCompanyName}:`, error);
+        res.status(500).json({ message: 'Server error deleting remote access detail', error: error.message });
+    }
+});
+
 module.exports = router; 
