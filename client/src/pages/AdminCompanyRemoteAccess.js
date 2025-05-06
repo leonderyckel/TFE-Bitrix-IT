@@ -154,7 +154,7 @@ const AdminCompanyRemoteAccess = () => {
                     <Typography variant="h6" gutterBottom>Add New Remote Access</Typography>
                     <TextField label="Title (e.g., TeamViewer PC, VPN Office)" name="title" value={newRemoteAccess.title} onChange={handleInputChange} fullWidth margin="normal" disabled={formSubmitting} />
                     <TextField label="Identifier (e.g., ID, Username, IP)" name="identifier" value={newRemoteAccess.identifier} onChange={handleInputChange} fullWidth margin="normal" disabled={formSubmitting} />
-                    <TextField label="Password" name="password" type="password" value={newRemoteAccess.password} onChange={handleInputChange} fullWidth margin="normal" disabled={formSubmitting} />
+                    <TextField label="Password (Optional)" name="password" type="password" value={newRemoteAccess.password} onChange={handleInputChange} fullWidth margin="normal" disabled={formSubmitting} />
                     <TextField label="Notes (Optional)" name="notes" value={newRemoteAccess.notes} onChange={handleInputChange} fullWidth margin="normal" multiline rows={3} disabled={formSubmitting} />
                     <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                         <Button onClick={() => setShowAddForm(false)} sx={{ mr: 1 }} disabled={formSubmitting}>Cancel</Button>
@@ -191,16 +191,18 @@ const AdminCompanyRemoteAccess = () => {
                                                         {visibleDetails[ra._id]?.identifier ? <VisibilityOff fontSize="inherit" /> : <Visibility fontSize="inherit" />}
                                                     </IconButton>
                                                 </Box>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: ra.notes ? 0.5 : 0 }}>
-                                                    <Typography component="span" variant="body2" sx={{ minWidth: '80px', fontWeight: 'medium', color: 'text.secondary' }}>Pass:</Typography>
-                                                    <Typography component="span" variant="body2" sx={{ mr: 1, wordBreak: 'break-all' }}>
-                                                        {visibleDetails[ra._id]?.password ? (ra.password || "(empty)") : '••••••••'}
-                                                    </Typography>
-                                                    <IconButton onClick={() => copyToClipboard(ra.password, "Password")} size="small" aria-label="copy password" sx={{ p: 0.5 }}><ContentCopyIcon fontSize="inherit" /></IconButton>
-                                                    <IconButton onClick={() => toggleDetailVisibility(ra._id, 'password')} size="small" aria-label="toggle password visibility" sx={{ p: 0.5 }}>
-                                                        {visibleDetails[ra._id]?.password ? <VisibilityOff fontSize="inherit" /> : <Visibility fontSize="inherit" />}
-                                                    </IconButton>
-                                                </Box>
+                                                {ra.password && (
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: ra.notes ? 0.5 : 0 }}>
+                                                        <Typography component="span" variant="body2" sx={{ minWidth: '80px', fontWeight: 'medium', color: 'text.secondary' }}>Pass:</Typography>
+                                                        <Typography component="span" variant="body2" sx={{ mr: 1, wordBreak: 'break-all' }}>
+                                                            {visibleDetails[ra._id]?.password ? (ra.password || "(empty)") : '••••••••'}
+                                                        </Typography>
+                                                        <IconButton onClick={() => copyToClipboard(ra.password, "Password")} size="small" aria-label="copy password" sx={{ p: 0.5 }}><ContentCopyIcon fontSize="inherit" /></IconButton>
+                                                        <IconButton onClick={() => toggleDetailVisibility(ra._id, 'password')} size="small" aria-label="toggle password visibility" sx={{ p: 0.5 }}>
+                                                            {visibleDetails[ra._id]?.password ? <VisibilityOff fontSize="inherit" /> : <Visibility fontSize="inherit" />}
+                                                        </IconButton>
+                                                    </Box>
+                                                )}
                                                 {ra.notes && (
                                                     <Box sx={{ display: 'flex', alignItems: 'flex-start', mt: 0.5 }}>
                                                         <NotesIcon fontSize="small" sx={{ color: 'text.secondary', mr: 0.8, mt: '3px' }}/>
