@@ -39,7 +39,7 @@ const accessTypes = [
     { value: 'ssh', label: 'SSH' },
     { value: 'vnc', label: 'VNC' },
     { value: 'web', label: 'Web Link' },
-    { value: 'other', label: 'Other/Manual' },
+    { value: 'other', label: 'Other' },
 ];
 
 const AdminCompanyRemoteAccess = () => {
