@@ -6,6 +6,39 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const nodemailer = require('nodemailer');
 
+/**
+ * @swagger
+ * tags:
+ *   name: Admin API
+ *   description: API administrative (accès restreint)
+ *
+ * /api/admin/login:
+ *   post:
+ *     summary: Connexion administrateur
+ *     tags: [Admin API]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 format: password
+ *     responses:
+ *       200:
+ *         description: Connexion réussie
+ *       401:
+ *         description: Identifiants invalides
+ */
+
 // Configure nodemailer transporter for custom SMTP
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
@@ -193,6 +226,22 @@ router.get('/profile', (req, res) => {
 
 // TICKET MANAGEMENT ROUTES
 
+/**
+ * @swagger
+ * /api/admin/tickets:
+ *   get:
+ *     summary: Récupérer tous les tickets (Admin)
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Liste des tickets récupérée
+ *       401:
+ *         description: Non autorisé
+ *       403:
+ *         description: Accès interdit - Admin requis
+ */
 // Récupérer tous les tickets
 router.get('/tickets', async (req, res) => {
   try {
@@ -218,199 +267,45 @@ router.get('/tickets', async (req, res) => {
   }
 });
 
-// Récupérer un ticket spécifique
-router.get('/tickets/:id', async (req, res) => {
-  try {
-    const { Ticket, AdminUser } = getModels(); // Assurez-vous que AdminUser est bien récupéré ici
-    const ticket = await Ticket.findById(req.params.id)
-      .populate('client', 'firstName lastName email company')
-      // --- MODIFICATION ICI ---
-      // Spécifier explicitement le modèle pour populate 'technician'
-      .populate({
-          path: 'technician',
-          select: 'firstName lastName email', // Champs à sélectionner
-          model: AdminUser // Utiliser le modèle AdminUser de la connexion admin
-       })
-       // --- FIN MODIFICATION ---
-      .populate('comments.user', 'firstName lastName email');
-    
-    if (!ticket) {
-      return res.status(404).json({ message: 'Ticket not found' });
-    }
-    
-    res.json(ticket);
-  } catch (error) {
-    console.error('Error fetching ticket for admin:', error);
-    res.status(500).json({ message: 'Erreur serveur', error: error.message }); // Added error details
-  }
-});
-
-// Mettre à jour un ticket
-router.put('/tickets/:id', async (req, res) => {
-  try {
-    const { Ticket } = getModels();
-    const ticket = await Ticket.findById(req.params.id);
-    
-    if (!ticket) {
-      return res.status(404).json({ message: 'Ticket not found' });
-    }
-    
-    // Update ticket
-    Object.assign(ticket, req.body);
-    await ticket.save();
-    
-    // --- Emit WebSocket Event ---
-    const ticketId = req.params.id;
-    const updatedTicket = await Ticket.findById(ticketId)
-      .populate('client', 'firstName lastName email company isCompanyBoss')
-      .populate('comments.user', 'firstName lastName email') 
-      .populate({
-          path: 'technician',
-          select: 'firstName lastName email',
-          model: global.models.AdminUser
-       })
-      .lean();
-
-    if (updatedTicket) {
-      // Include a generic notification text for direct PUT updates
-      const notificationText = `Ticket ${updatedTicket.title || 'untitled'} details updated`;
-      req.io.to(ticketId).emit('ticket:updated', { ...updatedTicket, notificationText });
-      console.log(`Emitted ticket:updated event to room ${ticketId} after PUT update`);
-    }
-    // --- End Emit WebSocket Event ---
-
-    res.json(updatedTicket || ticket);
-  } catch (error) {
-    console.error('Error updating ticket for admin:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
-
-// Ajouter un commentaire à un ticket
-router.post('/tickets/:id/comments', async (req, res) => {
-  console.log(`[Admin Comment] Received comment request for ticket ${req.params.id} by admin ${req.admin._id}`); // Log start
-  try {
-    // Get models (Ticket from main connection, Notification from main, AdminUser from admin)
-    const { Ticket, Notification, AdminUser } = getModels(); 
-    const ticketId = req.params.id;
-    let ticket = await Ticket.findById(ticketId); // Get the ticket instance
-    
-    if (!ticket) {
-      console.log(`[Admin Comment] Ticket ${ticketId} not found.`);
-      return res.status(404).json({ message: 'Ticket not found' });
-    }
-    
-    // Add the comment using admin ID
-    const newComment = {
-      user: req.admin._id, // Use admin ID from auth middleware
-      content: req.body.content,
-      // userModel: 'AdminUser' // Store user model if needed for comment population
-    };
-    ticket.comments.push(newComment);
-    console.log(`[Admin Comment] Pushed comment to ticket ${ticketId}. Saving...`);
-    
-    await ticket.save(); // Save the ticket with the new comment
-    console.log(`[Admin Comment] Ticket ${ticketId} saved successfully.`);
-
-    // --- Emit WebSocket Event & Create Notification --- 
-    try {
-      console.log(`[Admin Comment] Populating ticket ${ticketId} for notification/emit...`);
-      // Fetch the updated ticket with populated fields for emitting and notification logic
-      // Ensure client and potentially technician are populated
-      const updatedTicket = await Ticket.findById(ticketId)
-        .populate('client', '_id firstName lastName email') // Need client ID for notification
-        .populate('comments.user', 'firstName lastName email') // Populate comment author if needed for WS
-        .populate({ // Keep technician populated for WS event consistency
-            path: 'technician',
-            select: '_id firstName lastName email',
-            model: AdminUser // Use AdminUser model for population
-         })
-        .lean();
-
-      if (!updatedTicket) {
-        console.error(`[Admin Comment] CRITICAL: Ticket ${ticketId} not found AFTER saving comment!`);
-        throw new Error('Ticket not found after saving admin comment');
-      }
-      console.log(`[Admin Comment] Ticket ${ticketId} populated. Client: ${updatedTicket.client?._id}, Technician: ${updatedTicket.technician?._id}`);
-
-      // Emit WebSocket event first
-      if (req.io) {
-        // Include notification text in the payload
-        req.io.to(ticketId).emit('ticket:updated', { ...updatedTicket, notificationText });
-        console.log(`[Admin Comment] Emitted ticket:updated event to room ${ticketId}`);
-      } else {
-        console.error('[Admin Comment] req.io not found.');
-      }
-
-      // Prepare notification details
-      const commenterName = req.admin.firstName || 'Admin/Technician';
-      // Use English and specific format, no ID
-      const notificationText = `New comment from ${commenterName} on ticket ${updatedTicket.title || 'untitled'}`;
-      const notificationLink = `/tickets/${ticketId}`;
-      console.log(`[Admin Comment] Preparing notification. Text: "${notificationText}", Link: ${notificationLink}`);
-
-      let notificationsToCreate = [];
-      const commenterId = req.admin._id.toString();
-      console.log(`[Admin Comment] Commenter ID: ${commenterId}`);
-
-      // Notify the client (User model)
-      if (updatedTicket.client && updatedTicket.client._id) {
-          console.log(`[Admin Comment] Client found (${updatedTicket.client._id}). Adding notification.`);
-          notificationsToCreate.push({
-              userRef: updatedTicket.client._id,
-              userModel: 'User', 
-              text: notificationText,
-              link: notificationLink
-          });
-      } else {
-          console.warn(`[Admin Comment] Ticket ${ticketId} has no client assigned, cannot notify.`);
-      }
-
-      // Don't notify the technician about their own comment
-      console.log(`[Admin Comment] Checking technician notification. Assigned Tech: ${updatedTicket.technician?._id}`);
-      if (updatedTicket.technician && updatedTicket.technician._id.toString() !== commenterId) {
-          console.log(`[Admin Comment] Technician (${updatedTicket.technician._id}) is different from commenter. Notifying technician is NOT YET IMPLEMENTED HERE for admin comments, only client.`);
-          // If you want admins/techs to notify other admins/techs (except themselves), add logic here:
-          // notificationsToCreate.push({ userRef: updatedTicket.technician._id, userModel: 'AdminUser', text: notificationText, link: adminNotificationLink });
-      } else if (updatedTicket.technician) {
-           console.log(`[Admin Comment] Technician ID is the same as commenter. Not notifying technician.`);
-      }
-      // Could potentially notify OTHER admins here if required
-
-      // Create notifications in the database
-      console.log(`[Admin Comment] Number of notifications to create: ${notificationsToCreate.length}`);
-      if (notificationsToCreate.length > 0) {
-        console.log(`[Admin Comment] Attempting to insert ${notificationsToCreate.length} notifications into DB...`);
-        await Notification.insertMany(notificationsToCreate);
-        console.log(`[Admin Comment] Successfully created ${notificationsToCreate.length} notifications in DB for ticket ${ticketId} admin comment`);
-        // Send email notification to client if present
-        if (updatedTicket.client && updatedTicket.client.email) {
-          await sendNotificationEmail(
-            updatedTicket.client.email,
-            notificationText,
-            notificationText,
-            updatedTicket.status
-          );
-        }
-      }
-
-      // Send HTTP response back with the updated ticket
-      console.log(`[Admin Comment] Sending HTTP response for ticket ${ticketId}`);
-      res.json(updatedTicket); 
-
-    } catch (error) {
-      console.error('[Admin Comment] Error during notification/population stage:', error);
-      // Fallback: send original ticket save result if population/notification failed
-      res.status(500).json(ticket.toObject()); // Send plain object
-    }
-    // --- End Emit & Create ---
-
-  } catch (error) {
-    console.error('[Admin Comment] Top-level error adding comment:', error);
-    res.status(500).json({ message: 'Erreur serveur', error: error.message });
-  }
-});
-
+/**
+ * @swagger
+ * /api/admin/tickets/{id}/progress:
+ *   post:
+ *     summary: Ajouter une mise à jour de progression à un ticket
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du ticket
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               technicianId:
+ *                 type: string
+ *               scheduledDate:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       200:
+ *         description: Progression ajoutée
+ *       400:
+ *         description: Données invalides
+ *       404:
+ *         description: Ticket non trouvé
+ */
 // Ajouter une mise à jour de progression à un ticket
 router.post('/tickets/:id/progress', async (req, res) => {
   try {
@@ -592,6 +487,359 @@ router.post('/tickets/:id/progress', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/tickets/{id}:
+ *   get:
+ *     summary: Récupérer un ticket spécifique (Admin)
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du ticket
+ *     responses:
+ *       200:
+ *         description: Ticket récupéré
+ *       401:
+ *         description: Non autorisé
+ *       403:
+ *         description: Accès interdit - Admin requis
+ */
+// Récupérer un ticket spécifique
+router.get('/tickets/:id', async (req, res) => {
+  try {
+    const { Ticket, AdminUser } = getModels(); // Assurez-vous que AdminUser est bien récupéré ici
+    const ticket = await Ticket.findById(req.params.id)
+      .populate('client', 'firstName lastName email company')
+      // --- MODIFICATION ICI ---
+      // Spécifier explicitement le modèle pour populate 'technician'
+      .populate({
+          path: 'technician',
+          select: 'firstName lastName email', // Champs à sélectionner
+          model: AdminUser // Utiliser le modèle AdminUser de la connexion admin
+       })
+       // --- FIN MODIFICATION ---
+      .populate('comments.user', 'firstName lastName email');
+    
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+    
+    res.json(ticket);
+  } catch (error) {
+    console.error('Error fetching ticket for admin:', error);
+    res.status(500).json({ message: 'Erreur serveur', error: error.message }); // Added error details
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/tickets/{id}:
+ *   put:
+ *     summary: Mettre à jour un ticket (Admin)
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du ticket
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               priority:
+ *                 type: string
+ *               category:
+ *                 type: string
+ *               clientId:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *               progress:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     date:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedBy:
+ *                       type: string
+ *                       format: uuid
+ *               comments:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: string
+ *                       format: uuid
+ *                     content:
+ *                       type: string
+ *     responses:
+ *       200:
+ *         description: Ticket mis à jour
+ *       401:
+ *         description: Non autorisé
+ *       403:
+ *         description: Accès interdit - Admin requis
+ *       404:
+ *         description: Ticket non trouvé
+ */
+// Mettre à jour un ticket
+router.put('/tickets/:id', async (req, res) => {
+  try {
+    const { Ticket } = getModels();
+    const ticket = await Ticket.findById(req.params.id);
+    
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+    
+    // Update ticket
+    Object.assign(ticket, req.body);
+    await ticket.save();
+    
+    // --- Emit WebSocket Event ---
+    const ticketId = req.params.id;
+    const updatedTicket = await Ticket.findById(ticketId)
+      .populate('client', 'firstName lastName email company isCompanyBoss')
+      .populate('comments.user', 'firstName lastName email') 
+      .populate({
+          path: 'technician',
+          select: 'firstName lastName email',
+          model: global.models.AdminUser
+       })
+      .lean();
+
+    if (updatedTicket) {
+      // Include a generic notification text for direct PUT updates
+      const notificationText = `Ticket ${updatedTicket.title || 'untitled'} details updated`;
+      req.io.to(ticketId).emit('ticket:updated', { ...updatedTicket, notificationText });
+      console.log(`Emitted ticket:updated event to room ${ticketId} after PUT update`);
+    }
+    // --- End Emit WebSocket Event ---
+
+    res.json(updatedTicket || ticket);
+  } catch (error) {
+    console.error('Error updating ticket for admin:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/tickets/{id}/comments:
+ *   post:
+ *     summary: Ajouter un commentaire à un ticket (Admin)
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du ticket
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               content:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Commentaire ajouté
+ *       401:
+ *         description: Non autorisé
+ *       403:
+ *         description: Accès interdit - Admin requis
+ *       404:
+ *         description: Ticket non trouvé
+ */
+// Ajouter un commentaire à un ticket
+router.post('/tickets/:id/comments', async (req, res) => {
+  console.log(`[Admin Comment] Received comment request for ticket ${req.params.id} by admin ${req.admin._id}`); // Log start
+  try {
+    // Get models (Ticket from main connection, Notification from main, AdminUser from admin)
+    const { Ticket, Notification, AdminUser } = getModels(); 
+    const ticketId = req.params.id;
+    let ticket = await Ticket.findById(ticketId); // Get the ticket instance
+    
+    if (!ticket) {
+      console.log(`[Admin Comment] Ticket ${ticketId} not found.`);
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+    
+    // Add the comment using admin ID
+    const newComment = {
+      user: req.admin._id, // Use admin ID from auth middleware
+      content: req.body.content,
+      // userModel: 'AdminUser' // Store user model if needed for comment population
+    };
+    ticket.comments.push(newComment);
+    console.log(`[Admin Comment] Pushed comment to ticket ${ticketId}. Saving...`);
+    
+    await ticket.save(); // Save the ticket with the new comment
+    console.log(`[Admin Comment] Ticket ${ticketId} saved successfully.`);
+
+    // --- Emit WebSocket Event & Create Notification --- 
+    try {
+      console.log(`[Admin Comment] Populating ticket ${ticketId} for notification/emit...`);
+      // Fetch the updated ticket with populated fields for emitting and notification logic
+      // Ensure client and potentially technician are populated
+      const updatedTicket = await Ticket.findById(ticketId)
+        .populate('client', '_id firstName lastName email') // Need client ID for notification
+        .populate('comments.user', 'firstName lastName email') // Populate comment author if needed for WS
+        .populate({ // Keep technician populated for WS event consistency
+            path: 'technician',
+            select: '_id firstName lastName email',
+            model: AdminUser // Use AdminUser model for population
+         })
+        .lean();
+
+      if (!updatedTicket) {
+        console.error(`[Admin Comment] CRITICAL: Ticket ${ticketId} not found AFTER saving comment!`);
+        throw new Error('Ticket not found after saving admin comment');
+      }
+      console.log(`[Admin Comment] Ticket ${ticketId} populated. Client: ${updatedTicket.client?._id}, Technician: ${updatedTicket.technician?._id}`);
+
+      // Emit WebSocket event first
+      if (req.io) {
+        // Include notification text in the payload
+        req.io.to(ticketId).emit('ticket:updated', { ...updatedTicket, notificationText });
+        console.log(`[Admin Comment] Emitted ticket:updated event to room ${ticketId}`);
+      } else {
+        console.error('[Admin Comment] req.io not found.');
+      }
+
+      // Prepare notification details
+      const commenterName = req.admin.firstName || 'Admin/Technician';
+      // Use English and specific format, no ID
+      const notificationText = `New comment from ${commenterName} on ticket ${updatedTicket.title || 'untitled'}`;
+      const notificationLink = `/tickets/${ticketId}`;
+      console.log(`[Admin Comment] Preparing notification. Text: "${notificationText}", Link: ${notificationLink}`);
+
+      let notificationsToCreate = [];
+      const commenterId = req.admin._id.toString();
+      console.log(`[Admin Comment] Commenter ID: ${commenterId}`);
+
+      // Notify the client (User model)
+      if (updatedTicket.client && updatedTicket.client._id) {
+          console.log(`[Admin Comment] Client found (${updatedTicket.client._id}). Adding notification.`);
+          notificationsToCreate.push({
+              userRef: updatedTicket.client._id,
+              userModel: 'User', 
+              text: notificationText,
+              link: notificationLink
+          });
+      } else {
+          console.warn(`[Admin Comment] Ticket ${ticketId} has no client assigned, cannot notify.`);
+      }
+
+      // Don't notify the technician about their own comment
+      console.log(`[Admin Comment] Checking technician notification. Assigned Tech: ${updatedTicket.technician?._id}`);
+      if (updatedTicket.technician && updatedTicket.technician._id.toString() !== commenterId) {
+          console.log(`[Admin Comment] Technician (${updatedTicket.technician._id}) is different from commenter. Notifying technician is NOT YET IMPLEMENTED HERE for admin comments, only client.`);
+          // If you want admins/techs to notify other admins/techs (except themselves), add logic here:
+          // notificationsToCreate.push({ userRef: updatedTicket.technician._id, userModel: 'AdminUser', text: notificationText, link: adminNotificationLink });
+      } else if (updatedTicket.technician) {
+           console.log(`[Admin Comment] Technician ID is the same as commenter. Not notifying technician.`);
+      }
+      // Could potentially notify OTHER admins here if required
+
+      // Create notifications in the database
+      console.log(`[Admin Comment] Number of notifications to create: ${notificationsToCreate.length}`);
+      if (notificationsToCreate.length > 0) {
+        console.log(`[Admin Comment] Attempting to insert ${notificationsToCreate.length} notifications into DB...`);
+        await Notification.insertMany(notificationsToCreate);
+        console.log(`[Admin Comment] Successfully created ${notificationsToCreate.length} notifications in DB for ticket ${ticketId} admin comment`);
+        // Send email notification to client if present
+        if (updatedTicket.client && updatedTicket.client.email) {
+          await sendNotificationEmail(
+            updatedTicket.client.email,
+            notificationText,
+            notificationText,
+            updatedTicket.status
+          );
+        }
+      }
+
+      // Send HTTP response back with the updated ticket
+      console.log(`[Admin Comment] Sending HTTP response for ticket ${ticketId}`);
+      res.json(updatedTicket); 
+
+    } catch (error) {
+      console.error('[Admin Comment] Error during notification/population stage:', error);
+      // Fallback: send original ticket save result if population/notification failed
+      res.status(500).json(ticket.toObject()); // Send plain object
+    }
+    // --- End Emit & Create ---
+
+  } catch (error) {
+    console.error('[Admin Comment] Top-level error adding comment:', error);
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/tickets/{id}/assign:
+ *   post:
+ *     summary: Assigner un technicien à un ticket (Admin)
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du ticket
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               technicianId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Technicien assigné
+ *       401:
+ *         description: Non autorisé
+ *       403:
+ *         description: Accès interdit - Admin requis
+ *       404:
+ *         description: Technicien non trouvé
+ */
 // Assigner un technicien à un ticket
 router.post('/tickets/:id/assign', async (req, res) => {
   console.log(`[Assign] Attempting assign for ticket ${req.params.id}`);
@@ -706,6 +954,40 @@ router.post('/tickets/:id/assign', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/tickets/{id}/cancel:
+ *   post:
+ *     summary: Annuler un ticket (Admin)
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du ticket
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Ticket annulé
+ *       401:
+ *         description: Non autorisé
+ *       403:
+ *         description: Accès interdit - Admin requis
+ *       404:
+ *         description: Ticket non trouvé
+ */
 // Annuler un ticket
 router.post('/tickets/:id/cancel', async (req, res) => {
   try {
@@ -808,6 +1090,40 @@ router.post('/tickets/:id/cancel', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/tickets/{id}/close:
+ *   post:
+ *     summary: Clôturer un ticket (Admin)
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du ticket
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               resolutionDescription:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Ticket clôturé
+ *       401:
+ *         description: Non autorisé
+ *       403:
+ *         description: Accès interdit - Admin requis
+ *       404:
+ *         description: Ticket non trouvé
+ */
 // Clôturer un ticket
 router.post('/tickets/:id/close', async (req, res) => {
   try {
@@ -962,6 +1278,46 @@ router.get('/clients', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/clients:
+ *   post:
+ *     summary: Créer un nouveau client (par un technicien)
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *               - firstName
+ *               - lastName
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               firstName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *               company:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Client créé
+ *       400:
+ *         description: Données invalides ou utilisateur existant
+ *       403:
+ *         description: Seuls les techniciens peuvent créer des clients
+ */
 // Créer un nouvel administrateur
 router.post('/admins', async (req, res) => {
   try {
@@ -1094,63 +1450,50 @@ router.get('/calendar-tickets', async (req, res) => {
 
 // --- CLIENT CRUD by Admin ---
 
-// POST /admin/clients - Create a new client user
-router.post('/clients', async (req, res) => {
-  // Check if the logged-in user is a technician
-  if (req.admin.role !== 'technician') {
-      return res.status(403).json({ message: 'Forbidden: Only technicians can create clients.' });
-  }
-  
-  try {
-    const { User, AdminUser } = getModels();
-    // Destructure address
-    const { email, password, firstName, lastName, company, address } = req.body;
-
-    // Basic validation
-    if (!email || !password || !firstName || !lastName) {
-        return res.status(400).json({ message: 'Missing required fields: email, password, firstName, lastName.' });
-    }
-
-    // Check if user already exists in either database
-    const existingUser = await User.findOne({ email });
-    const existingAdmin = await AdminUser.findOne({ email });
-
-    if (existingUser || existingAdmin) {
-      return res.status(400).json({ message: 'User with this email already exists.' });
-    }
-
-    // Create the new client user in the main User collection
-    const newUser = await User.create({
-      email,
-      password, // Password will be hashed by the pre-save hook in User model
-      firstName,
-      lastName,
-      company, // Company is optional based on schema, handle if required
-      address, // Add address
-      role: 'client' // Explicitly set role
-    });
-
-    // Return only necessary info, exclude password
-    res.status(201).json({
-        _id: newUser._id,
-        email: newUser.email,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        company: newUser.company,
-        address: newUser.address, // Return address
-        role: newUser.role
-    });
-
-  } catch (error) {
-    console.error('Error creating client by admin:', error);
-    // Handle potential validation errors from Mongoose
-    if (error.name === 'ValidationError') {
-        return res.status(400).json({ message: 'Validation Error', errors: error.errors });
-    }
-    res.status(500).json({ message: 'Server error while creating client', error: error.message });
-  }
-});
-
+/**
+ * @swagger
+ * /api/admin/clients/{clientId}:
+ *   put:
+ *     summary: Mettre à jour un client (Admin)
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du client
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               company:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *               isCompanyBoss:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Client mis à jour
+ *       401:
+ *         description: Non autorisé
+ *       403:
+ *         description: Accès interdit - Admin requis
+ *       404:
+ *         description: Client non trouvé
+ */
 // PUT /admin/clients/:clientId - Update an existing client user
 router.put('/clients/:clientId', async (req, res) => {
   try {
@@ -1228,6 +1571,31 @@ router.put('/clients/:clientId', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/clients/{clientId}:
+ *   delete:
+ *     summary: Supprimer un client (Admin)
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du client
+ *     responses:
+ *       200:
+ *         description: Client supprimé
+ *       401:
+ *         description: Non autorisé
+ *       403:
+ *         description: Accès interdit - Admin requis
+ *       404:
+ *         description: Client non trouvé
+ */
 // DELETE /admin/clients/:clientId - Delete a client user
 router.delete('/clients/:clientId', async (req, res) => {
     // Only admins should delete clients
@@ -1274,6 +1642,29 @@ router.delete('/clients/:clientId', async (req, res) => {
 
 // --- END CLIENT CRUD ---
 
+/**
+ * @swagger
+ * /api/admin/companies:
+ *   post:
+ *     summary: Créer une nouvelle entreprise (INCHANGÉ)
+ *     tags: [Admin API]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               companyName:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Entreprise créée
+ *       400:
+ *         description: Données invalides ou entreprise existante
+ *       409:
+ *         description: Entreprise déjà existante
+ */
 // POST /api/admin/companies - Create a new company entry (INCHANGÉ)
 router.post('/companies', async (req, res) => {
     const { companyName } = req.body;
@@ -1328,6 +1719,18 @@ router.post('/companies', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/admin/companies-with-data:
+ *   get:
+ *     summary: Récupérer les entreprises et leurs données sensibles (SIMPLIFIÉ)
+ *     tags: [Admin API]
+ *     responses:
+ *       200:
+ *         description: Liste des entreprises et leurs données sensibles récupérées
+ *       500:
+ *         description: Erreur lors de la récupération des données des entreprises
+ */
 // GET /api/admin/companies-with-data - Fetch companies and their sensitive data (SIMPLIFIÉ)
 router.get('/companies-with-data', async (req, res) => {
     console.log('[Admin Companies GET - Simple] Fetching companies from Sensitive Data only...');
@@ -1363,6 +1766,27 @@ router.get('/companies-with-data', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/admin/companies/{companyName}/diagram:
+ *   get:
+ *     summary: Récupérer les données de diagramme d'une entreprise
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Nom de l'entreprise
+ *     responses:
+ *       200:
+ *         description: Données du diagramme récupérées
+ *       404:
+ *         description: Entreprise non trouvée
+ */
 // GET /api/admin/companies/:companyName/diagram - Fetch diagram data for a company
 router.get('/companies/:companyName/diagram', async (req, res) => {
     const { companyName } = req.params;
@@ -1386,6 +1810,50 @@ router.get('/companies/:companyName/diagram', async (req, res) => {
     } catch (error) {
         console.error(`[Admin Diagram GET] Error fetching diagram for ${decodedCompanyName}:`, error);
         res.status(500).json({ message: 'Server error fetching diagram data', error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/admin/companies/{companyName}/remote-access:
+ *   get:
+ *     summary: Récupérer les accès distants d'une entreprise
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Nom de l'entreprise
+ *     responses:
+ *       200:
+ *         description: Accès distants récupérés
+ *       404:
+ *         description: Entreprise ou accès non trouvés
+ */
+// GET /api/admin/companies/:companyName/remote-access - Fetch all remote access details for a company
+router.get('/companies/:companyName/remote-access', async (req, res) => {
+    const { companyName } = req.params;
+    const decodedCompanyName = decodeURIComponent(companyName);
+    console.log(`[Admin RemoteAccess GET] Fetching remote access details for company: ${decodedCompanyName}`);
+
+    try {
+        const { CompanySensitiveData } = getModels();
+        const companyEntry = await CompanySensitiveData.findOne({ companyName: decodedCompanyName });
+
+        if (!companyEntry || !companyEntry.remoteAccessDetails) {
+            console.log(`[Admin RemoteAccess GET] No remote access details found for: ${decodedCompanyName}`);
+            return res.json([]); 
+        }
+
+        console.log(`[Admin RemoteAccess GET] Remote access details found for ${decodedCompanyName}`);
+        res.json(companyEntry.remoteAccessDetails); // Getters s'appliquent grâce à toJSON dans le schéma
+    } catch (error) {
+        console.error(`[Admin RemoteAccess GET] Error fetching remote access details for ${decodedCompanyName}:`, error);
+        res.status(500).json({ message: 'Server error fetching remote access details', error: error.message });
     }
 });
 
@@ -1579,29 +2047,6 @@ router.delete('/companies/:companyName/credentials/:credentialId', async (req, r
     }
 });
 
-// GET /api/admin/companies/:companyName/remote-access - Fetch all remote access details for a company
-router.get('/companies/:companyName/remote-access', async (req, res) => {
-    const { companyName } = req.params;
-    const decodedCompanyName = decodeURIComponent(companyName);
-    console.log(`[Admin RemoteAccess GET] Fetching remote access details for company: ${decodedCompanyName}`);
-
-    try {
-        const { CompanySensitiveData } = getModels();
-        const companyEntry = await CompanySensitiveData.findOne({ companyName: decodedCompanyName });
-
-        if (!companyEntry || !companyEntry.remoteAccessDetails) {
-            console.log(`[Admin RemoteAccess GET] No remote access details found for: ${decodedCompanyName}`);
-            return res.json([]); 
-        }
-
-        console.log(`[Admin RemoteAccess GET] Remote access details found for ${decodedCompanyName}`);
-        res.json(companyEntry.remoteAccessDetails); // Getters s'appliquent grâce à toJSON dans le schéma
-    } catch (error) {
-        console.error(`[Admin RemoteAccess GET] Error fetching remote access details for ${decodedCompanyName}:`, error);
-        res.status(500).json({ message: 'Server error fetching remote access details', error: error.message });
-    }
-});
-
 // POST /api/admin/companies/:companyName/remote-access - Add a new remote access detail
 router.post('/companies/:companyName/remote-access', async (req, res) => {
     const { companyName } = req.params;
@@ -1684,5 +2129,241 @@ router.delete('/companies/:companyName/remote-access/:accessId', async (req, res
         res.status(500).json({ message: 'Server error deleting remote access detail', error: error.message });
     }
 });
+
+/**
+ * @swagger
+ * /api/admin/clients:
+ *   get:
+ *     summary: Récupérer la liste de tous les clients
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Liste des clients récupérée
+ *       401:
+ *         description: Non autorisé
+ */
+// GET /api/admin/clients - Liste des clients
+
+/**
+ * @swagger
+ * /api/admin/clients/{clientId}:
+ *   get:
+ *     summary: Récupérer le détail d'un client
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du client
+ *     responses:
+ *       200:
+ *         description: Détail du client récupéré
+ *       401:
+ *         description: Non autorisé
+ *       404:
+ *         description: Client non trouvé
+ */
+// GET /api/admin/clients/:clientId - Détail d'un client
+
+/**
+ * @swagger
+ * /api/admin/companies:
+ *   get:
+ *     summary: Récupérer la liste de toutes les entreprises
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Liste des entreprises récupérée
+ *       401:
+ *         description: Non autorisé
+ */
+// GET /api/admin/companies - Liste des entreprises
+
+/**
+ * @swagger
+ * /api/admin/companies/{companyName}:
+ *   get:
+ *     summary: Récupérer le détail d'une entreprise
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Nom de l'entreprise
+ *     responses:
+ *       200:
+ *         description: Détail de l'entreprise récupéré
+ *       401:
+ *         description: Non autorisé
+ *       404:
+ *         description: Entreprise non trouvée
+ */
+// GET /api/admin/companies/:companyName - Détail d'une entreprise
+
+/**
+ * @swagger
+ * /api/admin/companies/{companyName}/remote-access:
+ *   post:
+ *     summary: Ajouter un accès distant à une entreprise
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Nom de l'entreprise
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - accessType
+ *               - identifier
+ *             properties:
+ *               accessType:
+ *                 type: string
+ *               identifier:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Accès distant ajouté
+ *       400:
+ *         description: Données invalides
+ *       401:
+ *         description: Non autorisé
+ *       404:
+ *         description: Entreprise non trouvée
+ */
+// POST /api/admin/companies/:companyName/remote-access - Ajout d'un accès distant
+
+/**
+ * @swagger
+ * /api/admin/companies/{companyName}/diagram:
+ *   put:
+ *     summary: Mettre à jour le diagramme d'une entreprise
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Nom de l'entreprise
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               diagramData:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Diagramme mis à jour
+ *       400:
+ *         description: Données invalides
+ *       401:
+ *         description: Non autorisé
+ *       404:
+ *         description: Entreprise non trouvée
+ */
+// PUT /api/admin/companies/:companyName/diagram - Mise à jour du diagramme
+
+/**
+ * @swagger
+ * /api/admin/tickets/{id}:
+ *   delete:
+ *     summary: Supprimer un ticket
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du ticket
+ *     responses:
+ *       200:
+ *         description: Ticket supprimé
+ *       401:
+ *         description: Non autorisé
+ *       404:
+ *         description: Ticket non trouvé
+ */
+// DELETE /api/admin/tickets/:id - Suppression d'un ticket
+
+/**
+ * @swagger
+ * /api/admin/clients/{clientId}:
+ *   delete:
+ *     summary: Supprimer un client
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du client
+ *     responses:
+ *       200:
+ *         description: Client supprimé
+ *       401:
+ *         description: Non autorisé
+ *       404:
+ *         description: Client non trouvé
+ */
+// DELETE /api/admin/clients/:clientId - Suppression d'un client
+
+/**
+ * @swagger
+ * /api/admin/companies/{companyName}:
+ *   delete:
+ *     summary: Supprimer une entreprise
+ *     tags: [Admin API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Nom de l'entreprise
+ *     responses:
+ *       200:
+ *         description: Entreprise supprimée
+ *       401:
+ *         description: Non autorisé
+ *       404:
+ *         description: Entreprise non trouvée
+ */
+// DELETE /api/admin/companies/:companyName - Suppression d'une entreprise
 
 module.exports = router; 

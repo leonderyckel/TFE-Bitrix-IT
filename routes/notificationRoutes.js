@@ -3,6 +3,100 @@ const { getModels } = require('../models');
 const { auth } = require('../middleware/auth'); // Assuming client auth middleware
 const { authAdmin } = require('../middleware/adminAuth'); // Corrected import path
 
+/**
+ * @swagger
+ * tags:
+ *   name: Notification API
+ *   description: API de gestion des notifications
+ * 
+ * @swagger
+ * /api/notifications:
+ *   get:
+ *     summary: Récupérer les notifications de l'utilisateur
+ *     tags: [Notification API]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: read
+ *         schema:
+ *           type: boolean
+ *         description: Filtrer par statut de lecture
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Nombre maximum de notifications à récupérer
+ *     responses:
+ *       200:
+ *         description: Liste des notifications récupérée
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 notifications:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                       message:
+ *                         type: string
+ *                       read:
+ *                         type: boolean
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                 unreadCount:
+ *                   type: integer
+ *       401:
+ *         description: Non autorisé
+ * 
+ * @swagger
+ * /api/notifications/mark-read:
+ *   post:
+ *     summary: Marquer des notifications comme lues
+ *     tags: [Notification API]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - ids
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Liste des IDs de notifications à marquer comme lues
+ *     responses:
+ *       200:
+ *         description: Notifications marquées comme lues
+ *       400:
+ *         description: IDs de notifications invalides
+ *       401:
+ *         description: Non autorisé
+ * 
+ * @swagger
+ * /api/notifications/mark-all-read:
+ *   post:
+ *     summary: Marquer toutes les notifications comme lues
+ *     tags: [Notification API]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Toutes les notifications marquées comme lues
+ *       401:
+ *         description: Non autorisé
+ */
+
 const router = express.Router();
 
 // Middleware to determine user type and ID

@@ -8,11 +8,18 @@ const { initializeModels } = require('./models');
 // Import http and socket.io
 const http = require('http');
 const { Server } = require("socket.io");
+// Import Swagger
+const swaggerUi = require('swagger-ui-express');
+const { publicSpecs, adminSpecs, notifSpecs, allSpecs } = require('./swagger-config');
+const auth = require('./middleware/auth');
 
 // Initialize Express app
 const app = express();
 // Create HTTP server
 const server = http.createServer(app);
+
+// Swagger Documentation unique (toutes les routes)
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(allSpecs));
 
 // --- Socket.io Setup ---
 const io = new Server(server, {
