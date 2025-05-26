@@ -97,6 +97,12 @@ const startServer = async () => {
     app.use('/api/admin', require('./routes/admin'));
     app.use('/api/notifications', require('./routes/notificationRoutes'));
 
+    // Servir le frontend React en production
+    app.use(express.static(path.join(__dirname, 'client/build')));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+    });
+
     // Error handling middleware
     app.use((err, req, res, next) => {
       console.error(err.stack);
