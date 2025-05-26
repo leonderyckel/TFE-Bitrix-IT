@@ -97,17 +97,19 @@ const startServer = async () => {
     app.use('/api/admin', require('./routes/admin'));
     app.use('/api/notifications', require('./routes/notificationRoutes'));
 
-    // Servir le frontend React en production
-    app.use(express.static(path.join(__dirname, 'client/build')));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-    });
-
     // Error handling middleware
     app.use((err, req, res, next) => {
       console.error(err.stack);
       res.status(500).json({ message: 'Something went wrong!' });
     });
+
+    // Servir le frontend React UNIQUEMENT en production, tout à la fin
+    if (process.env.NODE_ENV === 'production') {
+      app.use(express.static(path.join(__dirname, 'client/build')));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+      });
+    }
     
     const PORT = process.env.PORT || 5001;
     // Use the HTTP server to listen, not the Express app directly
