@@ -62,6 +62,7 @@ function TicketDetails() {
   const { enqueueSnackbar } = useSnackbar();
   const [liveTicket, setLiveTicket] = useState(null);
   const socketRef = useRef();
+  const prevTicketIdRef = useRef();
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentError, setCommentError] = useState(null);
@@ -71,25 +72,21 @@ function TicketDetails() {
       dispatch(fetchTicket({ ticketId, isAdmin: false }));
     }
 
-    const serverBaseUrl = API_URL.substring(0, API_URL.indexOf('/api')) || API_URL;
-    
-    socketRef.current = io(serverBaseUrl, { 
-    });
+    if (!socketRef.current) {
+      socketRef.current = io(API_URL);
+    }
     const socket = socketRef.current;
 
-    socket.on('connect', () => {
-      console.log('Socket connected:', socket.id);
-      if (ticketId) {
-        socket.emit('joinTicketRoom', ticketId);
-        console.log('Emitted joinTicketRoom for:', ticketId);
-      }
-    });
+    if (prevTicketIdRef.current && prevTicketIdRef.current !== ticketId) {
+      socket.emit('leaveTicketRoom', prevTicketIdRef.current);
+      console.log('Emitted leaveTicketRoom for:', prevTicketIdRef.current);
+    }
+    prevTicketIdRef.current = ticketId;
 
-    socket.on('disconnect', () => {
-      console.log('Socket disconnected');
-    });
+    socket.emit('joinTicketRoom', ticketId);
+    console.log('Emitted joinTicketRoom for:', ticketId);
 
-    socket.on('ticket:updated', (payload) => {
+    const handleTicketUpdated = (payload) => {
       const updatedTicket = payload;
       const notificationText = payload.notificationText || `Ticket ${updatedTicket.title || 'untitled'} updated`;
       console.log('Received ticket:updated', updatedTicket);
@@ -103,13 +100,14 @@ function TicketDetails() {
           ticketId: updatedTicket._id
         }));
       }
-    });
+    };
+    socket.on('ticket:updated', handleTicketUpdated);
 
     return () => {
-      console.log('Disconnecting socket...');
-      socket.disconnect();
+      socket.emit('leaveTicketRoom', ticketId);
+      socket.off('ticket:updated', handleTicketUpdated);
+      console.log('Disconnecting socket and leaving room for:', ticketId);
     };
-    
   }, [ticketId, dispatch, enqueueSnackbar]);
 
   const displayTicketData = liveTicket || currentTicket;
