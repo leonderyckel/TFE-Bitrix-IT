@@ -17,10 +17,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import PriorityHighIcon from '@mui/icons-material/PriorityHigh';
 import CancelIcon from '@mui/icons-material/Cancel';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import io from 'socket.io-client';
-
-// Socket instance
-let socket;
+import { useSocket } from '../components/SocketContext';
 
 function AdminDashboard() {
   const { user, token } = useSelector((state) => state.auth);
@@ -32,7 +29,7 @@ function AdminDashboard() {
   const [technicians, setTechnicians] = useState([]);
   const [selectedTechnicianFilter, setSelectedTechnicianFilter] = useState('all');
   const navigate = useNavigate();
-  const socketRef = useRef();
+  const socket = useSocket();
 
   // Wrap fetchTickets in useCallback to avoid recreating it on every render
   const fetchTickets = useCallback(async () => {
@@ -73,10 +70,6 @@ function AdminDashboard() {
     fetchTechnicians();
 
     // --- Socket.IO Setup ---
-    const serverBaseUrl = API_URL.substring(0, API_URL.indexOf('/api')) || API_URL;
-    socketRef.current = io(serverBaseUrl);
-    const socket = socketRef.current;
-
     socket.on('connect', () => {
       console.log('[AdminDashboard] Socket connected:', socket.id);
       // Join the admin room
@@ -105,13 +98,6 @@ function AdminDashboard() {
         )
       );
     });
-
-    // Cleanup
-    return () => {
-      console.log('[AdminDashboard] Disconnecting socket...');
-      socket.emit('leaveAdminRoom');
-      socket.disconnect();
-    };
 
   }, [fetchTickets, token]); // Include fetchTickets and token
 

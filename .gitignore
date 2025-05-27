@@ -8,6 +8,7 @@ client/node_modules/
 .env.development.local
 .env.test.local
 .env.production.local
+client/.env
 
 # Build files
 /build
@@ -27,3 +28,5 @@ yarn-error.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+swagger-config.js

@@ -6,6 +6,7 @@ import { Provider, useDispatch, useSelector } from 'react-redux';
 import store from './store';
 import { loadUserData } from './store/slices/authSlice';
 import { SnackbarProvider } from 'notistack';
+import { SocketProvider } from './components/SocketContext';
 
 // Components
 import Layout from './components/Layout';
@@ -278,7 +279,9 @@ function App() {
             }}
             autoHideDuration={4000}
           > 
-            <AppContent />
+            <SocketProvider>
+              <AppContent />
+            </SocketProvider>
           </SnackbarProvider>
         </Router>
       </ThemeProvider>

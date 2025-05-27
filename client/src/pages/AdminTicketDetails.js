@@ -23,11 +23,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import io from 'socket.io-client';
+import { useSocket } from '../components/SocketContext';
 import { useTheme } from '@mui/material/styles';
-
-// Socket instance
-let socket;
 
 function AdminTicketDetails() {
   const { id: ticketId } = useParams();
@@ -53,7 +50,7 @@ function AdminTicketDetails() {
 
   const dispatch = useDispatch();
   const theme = useTheme();
-  const socketRef = useRef();
+  const socket = useSocket();
 
   // Définir toutes les étapes possibles de progression
   const allProgressSteps = [
@@ -167,22 +164,10 @@ function AdminTicketDetails() {
         }
 
         // --- Establish Socket Connection AFTER initial load ---
-        if (!socketRef.current) { // Connect only once
-            const serverBaseUrl = API_URL.substring(0, API_URL.indexOf('/api')) || API_URL;
-            socketRef.current = io(serverBaseUrl);
-            const socket = socketRef.current;
-
-            socket.on('connect', () => {
-                console.log('[AdminTicketDetails] Socket connected:', socket.id);
-                if (ticketId) {
-                    socket.emit('joinTicketRoom', ticketId);
-                    console.log('[AdminTicketDetails] Emitted joinTicketRoom for:', ticketId);
-                }
-            });
-
-            socket.on('disconnect', () => {
-                console.log('[AdminTicketDetails] Socket disconnected');
-            });
+        if (!socket) { // Connect only once
+            socket.connect();
+            socket.emit('joinTicketRoom', ticketId);
+            console.log('[AdminTicketDetails] Emitted joinTicketRoom for:', ticketId);
 
             // Listen for updates specific to THIS ticket
             socket.on('ticket:updated', (updatedTicket) => {
@@ -224,16 +209,6 @@ function AdminTicketDetails() {
     };
 
     loadTicketData();
-
-    // --- Cleanup on component unmount ---
-    return () => {
-      if (socketRef.current) {
-        console.log('[AdminTicketDetails] Disconnecting socket...');
-        // No need to explicitly leave room if connection disconnects
-        socketRef.current.disconnect();
-        socketRef.current = null; // Clear the ref
-      }
-    };
 
   }, [ticketId, token, dispatch]);
 

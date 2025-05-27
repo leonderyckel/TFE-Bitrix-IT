@@ -44,14 +44,11 @@ import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import { useTheme } from '@mui/material/styles';
 import { useSnackbar } from 'notistack';
-import io from 'socket.io-client';
 import API_URL from '../config/api';
 import { addNotification } from '../store/slices/notificationSlice';
+import { useSocket } from '../components/SocketContext';
 
 dayjs.extend(isSameOrBefore);
-
-// Socket connection instance (create outside component to avoid re-creation)
-let socket;
 
 function TicketDetails() {
   const { id: ticketId } = useParams();
@@ -61,8 +58,7 @@ function TicketDetails() {
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
   const [liveTicket, setLiveTicket] = useState(null);
-  const socketRef = useRef();
-  const prevTicketIdRef = useRef();
+  const socket = useSocket();
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentError, setCommentError] = useState(null);
@@ -71,17 +67,6 @@ function TicketDetails() {
     if (ticketId) {
       dispatch(fetchTicket({ ticketId, isAdmin: false }));
     }
-
-    if (!socketRef.current) {
-      socketRef.current = io(API_URL);
-    }
-    const socket = socketRef.current;
-
-    if (prevTicketIdRef.current && prevTicketIdRef.current !== ticketId) {
-      socket.emit('leaveTicketRoom', prevTicketIdRef.current);
-      console.log('Emitted leaveTicketRoom for:', prevTicketIdRef.current);
-    }
-    prevTicketIdRef.current = ticketId;
 
     socket.emit('joinTicketRoom', ticketId);
     console.log('Emitted joinTicketRoom for:', ticketId);
@@ -106,9 +91,9 @@ function TicketDetails() {
     return () => {
       socket.emit('leaveTicketRoom', ticketId);
       socket.off('ticket:updated', handleTicketUpdated);
-      console.log('Disconnecting socket and leaving room for:', ticketId);
+      console.log('Left room and cleaned up listeners for:', ticketId);
     };
-  }, [ticketId, dispatch, enqueueSnackbar]);
+  }, [ticketId, dispatch, enqueueSnackbar, socket]);
 
   const displayTicketData = liveTicket || currentTicket;
 

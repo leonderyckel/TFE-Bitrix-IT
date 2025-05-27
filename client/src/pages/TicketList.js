@@ -28,6 +28,8 @@ import { fetchTickets, updateTicketInList } from '../store/slices/ticketSlice';
 import { addNotification } from '../store/slices/notificationSlice';
 import io from 'socket.io-client';
 import API_URL from '../config/api';
+import WS_URL from '../config/ws';
+import { useSocket } from '../components/SocketContext';
 
 // Socket instance (outside component)
 let socket;
@@ -39,39 +41,33 @@ const TicketList = () => {
   const { user } = useSelector((state) => state.auth);
   const theme = useTheme();
   const socketRef = useRef();
-  const joinedRoomsRef = useRef(new Set()); // Keep track of joined rooms
+  const joinedRoomsRef = useRef(new Set());
   const { enqueueSnackbar } = useSnackbar();
+  const socket = useSocket();
 
   useEffect(() => {
-    // Initial fetch
     dispatch(fetchTickets());
 
-    // --- Socket.IO Connection ---
-    const serverBaseUrl = API_URL.substring(0, API_URL.indexOf('/api')) || API_URL;
-    socketRef.current = io(serverBaseUrl);
+    if (!socketRef.current) {
+      socketRef.current = io(WS_URL);
+    }
     const socket = socketRef.current;
 
     socket.on('connect', () => {
       console.log('[TicketList] Socket connected:', socket.id);
-      // Initial room join logic will be handled by the next effect
     });
 
     socket.on('disconnect', () => {
       console.log('[TicketList] Socket disconnected');
-      joinedRoomsRef.current.clear(); // Clear joined rooms on disconnect
+      joinedRoomsRef.current.clear();
     });
 
-    // Listen for updates
-    socket.on('ticket:updated', (payload) => {
-      const updatedTicket = payload; // Extract ticket data
-      const notificationText = payload.notificationText || `Ticket ${updatedTicket.title || 'untitled'} updated`; // Use specific text or fallback
+    const handleTicketUpdated = (payload) => {
+      const updatedTicket = payload;
+      const notificationText = payload.notificationText || `Ticket ${updatedTicket.title || 'untitled'} updated`;
       console.log('[TicketList] Received ticket:updated', updatedTicket);
       console.log('[TicketList] Notification text received:', notificationText);
-
-      // 1. Update ticket list in Redux
-      dispatch(updateTicketInList(updatedTicket)); 
-      
-      // 2. Show toast notification (optional)
+      dispatch(updateTicketInList(updatedTicket));
       enqueueSnackbar(notificationText, {
         variant: 'info',
         action: (key) => (
@@ -86,27 +82,22 @@ const TicketList = () => {
           </Button>
         ),
       });
-
-      // 3. Add notification to the Redux store for the menu
       dispatch(addNotification({
-        text: notificationText, // Use the specific text
+        text: notificationText,
         ticketId: updatedTicket._id
       }));
-    });
-
-    // Cleanup
-    return () => {
-      console.log('[TicketList] Disconnecting socket...');
-      socket.disconnect();
-      joinedRoomsRef.current.clear();
     };
-    // Run only on mount/unmount
+    socket.on('ticket:updated', handleTicketUpdated);
+
+    return () => {
+      socket.off('ticket:updated', handleTicketUpdated);
+      console.log('[TicketList] Socket and listeners cleaned up.');
+    };
   }, [dispatch, enqueueSnackbar, navigate]);
 
-  // --- Effect to Manage Room Subscriptions based on tickets --- 
   useEffect(() => {
     const socket = socketRef.current;
-    if (!socket || !socket.connected) return; // Ensure socket is connected
+    if (!socket || !socket.connected) return;
 
     // Combine all visible ticket IDs
     const currentTicketIds = new Set([
@@ -118,7 +109,7 @@ const TicketList = () => {
     // Leave rooms for tickets no longer visible
     previouslyJoined.forEach(ticketId => {
       if (!currentTicketIds.has(ticketId)) {
-        socket.emit('leaveTicketRoom', ticketId); // NOTE: Need backend handler for leaveTicketRoom
+        socket.emit('leaveTicketRoom', ticketId);
         console.log(`[TicketList] Emitted leaveTicketRoom for ${ticketId}`);
         previouslyJoined.delete(ticketId);
       }
@@ -133,11 +124,8 @@ const TicketList = () => {
       }
     });
 
-    // Update the ref with the current set
-    joinedRoomsRef.current = previouslyJoined; 
-
-  // Re-run whenever the ticket lists change
-  }, [myTickets, companyTickets]); 
+    joinedRoomsRef.current = previouslyJoined;
+  }, [myTickets, companyTickets]);
 
   const getStatusColor = (status) => {
     switch (status) {
