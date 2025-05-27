@@ -2350,4 +2350,48 @@ router.delete('/companies/:companyName/remote-access/:accessId', async (req, res
  */
 // DELETE /api/admin/companies/:companyName - Suppression d'une entreprise
 
+// --- CRÉATION DE CLIENT (admin ou technicien) ---
+router.post('/clients', async (req, res) => {
+  const allowedRoles = ['admin', 'technician'];
+  if (!allowedRoles.includes(req.admin.role)) {
+    return res.status(403).json({ message: 'Forbidden: Only admins or technicians can create clients.' });
+  }
+  try {
+    const { User, AdminUser } = getModels();
+    const { email, password, firstName, lastName, company, address } = req.body;
+    if (!email || !password || !firstName || !lastName) {
+      return res.status(400).json({ message: 'Missing required fields: email, password, firstName, lastName.' });
+    }
+    const existingUser = await User.findOne({ email });
+    const existingAdmin = await AdminUser.findOne({ email });
+    if (existingUser || existingAdmin) {
+      return res.status(400).json({ message: 'User with this email already exists.' });
+    }
+    const newUser = await User.create({
+      email,
+      password,
+      firstName,
+      lastName,
+      company,
+      address,
+      role: 'client'
+    });
+    res.status(201).json({
+      _id: newUser._id,
+      email: newUser.email,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+      company: newUser.company,
+      address: newUser.address,
+      role: newUser.role
+    });
+  } catch (error) {
+    console.error('Error creating client by admin/technician:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: 'Validation Error', errors: error.errors });
+    }
+    res.status(500).json({ message: 'Server error while creating client', error: error.message });
+  }
+});
+
 module.exports = router; 
