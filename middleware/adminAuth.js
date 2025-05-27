@@ -8,7 +8,8 @@ const isPrivateNetwork = (ip) => {
     /^172\.(1[6-9]|2[0-9]|3[0-1])\./,  // 172.16.0.0 - 172.31.255.255
     /^192\.168\./,    // 192.168.0.0 - 192.168.255.255
     /^127\./,         // localhost
-    /^::1$/           // localhost IPv6
+    /^::1$/,          // localhost IPv6
+    /^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./ // 100.64.0.0/10 (WireGuard/Tailscale/CGNAT)
   ];
 
   return privateRanges.some(range => range.test(ip));
