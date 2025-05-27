@@ -1,8 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
-const ADMIN_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api/admin';
+const API_URL = process.env.REACT_APP_API_URL || '/api';
+const ADMIN_URL = process.env.REACT_APP_ADMIN_URL || '/api/admin';
 
 // Async thunks
 export const login = createAsyncThunk(
