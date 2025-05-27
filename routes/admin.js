@@ -1598,46 +1598,30 @@ router.put('/clients/:clientId', async (req, res) => {
  */
 // DELETE /admin/clients/:clientId - Delete a client user
 router.delete('/clients/:clientId', async (req, res) => {
-    // Only admins should delete clients
-    if (req.admin.role !== 'admin') {
-        return res.status(403).json({ message: 'Forbidden: Only admins can delete clients.' });
+  const allowedRoles = ['admin', 'technician'];
+  if (!allowedRoles.includes(req.admin.role)) {
+    return res.status(403).json({ message: 'Forbidden: Only admins or technicians can delete clients.' });
+  }
+  try {
+    const { User, Ticket } = getModels();
+    const { clientId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(clientId)) {
+      return res.status(400).json({ message: 'Invalid client ID format' });
     }
-
-    try {
-        const { User, Ticket } = getModels();
-        const { clientId } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(clientId)) {
-            return res.status(400).json({ message: 'Invalid client ID format' });
-        }
-
-        // Find the client to delete
-        const client = await User.findById(clientId);
-        if (!client || client.role !== 'client') {
-            return res.status(404).json({ message: 'Client not found' });
-        }
-
-        // --- Consideration: What to do with tickets associated with this client? ---
-        // Option 1: Delete them (potentially destructive)
-        // await Ticket.deleteMany({ client: clientId });
-        // Option 2: Unassign them or assign to a default admin (safer)
-        // await Ticket.updateMany({ client: clientId }, { $unset: { client: "" } }); // Example: remove client ref
-        // Option 3: Prevent deletion if tickets exist (safest)
-        const associatedTickets = await Ticket.countDocuments({ client: clientId });
-        if (associatedTickets > 0) {
-             return res.status(400).json({ message: `Cannot delete client: They have ${associatedTickets} associated ticket(s). Reassign or delete tickets first.` });
-        }
-        // --- End Consideration ---
-
-        // If deletion is allowed (e.g., no associated tickets)
-        await User.findByIdAndDelete(clientId);
-
-        res.status(200).json({ message: 'Client deleted successfully' });
-
-    } catch (error) {
-        console.error('Error deleting client by admin:', error);
-        res.status(500).json({ message: 'Server error while deleting client', error: error.message });
+    const client = await User.findById(clientId);
+    if (!client || client.role !== 'client') {
+      return res.status(404).json({ message: 'Client not found' });
     }
+    const associatedTickets = await Ticket.countDocuments({ client: clientId });
+    if (associatedTickets > 0) {
+      return res.status(400).json({ message: `Cannot delete client: They have ${associatedTickets} associated ticket(s). Reassign or delete tickets first.` });
+    }
+    await User.findByIdAndDelete(clientId);
+    res.status(200).json({ message: 'Client deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting client by admin/technician:', error);
+    res.status(500).json({ message: 'Server error while deleting client', error: error.message });
+  }
 });
 
 // --- END CLIENT CRUD ---
