@@ -10,15 +10,20 @@ const isPrivateNetwork = (ip) => {
   return allowedRange.test(normalizedIp);
 };
 
+const isLocalhost = (ip) => {
+  // Gère les IPs localhost IPv4 et IPv6
+  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+};
+
 const adminAuth = async (req, res, next) => {
   try {
-    // Vérifier si la requête vient d'un réseau privé
+    // Vérifier si la requête vient d'un réseau privé ou de localhost
     const clientIP = req.ip;
     console.log('Admin auth: Client IP', clientIP);
     
-    if (!isPrivateNetwork(clientIP)) {
+    if (!isPrivateNetwork(clientIP) && !isLocalhost(clientIP)) {
       return res.status(403).json({
-        message: 'Access restricted to private network'
+        message: 'Access restricted to private network or localhost'
       });
     }
 
