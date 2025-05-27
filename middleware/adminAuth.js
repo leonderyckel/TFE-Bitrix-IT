@@ -2,7 +2,9 @@ const jwt = require('jsonwebtoken');
 const { getModels } = require('../models');
 
 const isPrivateNetwork = (ip) => {
-  // Liste des plages d'IP privées
+  // Gère les IPs du type ::ffff:192.168.80.98 ou ::ffff:100.118.31.88
+  const normalizedIp = ip.replace(/^::ffff:/, '');
+
   const privateRanges = [
     /^10\./,          // 10.0.0.0 - 10.255.255.255
     /^172\.(1[6-9]|2[0-9]|3[0-1])\./,  // 172.16.0.0 - 172.31.255.255
@@ -12,7 +14,7 @@ const isPrivateNetwork = (ip) => {
     /^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./ // 100.64.0.0/10 (WireGuard/Tailscale/CGNAT)
   ];
 
-  return privateRanges.some(range => range.test(ip));
+  return privateRanges.some(range => range.test(normalizedIp));
 };
 
 const adminAuth = async (req, res, next) => {
