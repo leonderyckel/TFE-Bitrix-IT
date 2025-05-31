@@ -21,11 +21,21 @@ const server = http.createServer(app);
 // Swagger Documentation unique (toutes les routes)
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(allSpecs));
 
+// --- CORS origins setup ---
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? [process.env.FRONTEND_URL]
+  : [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002'
+    ];
+
 // --- Socket.io Setup ---
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"], // Allow frontend origins
-    methods: ["GET", "POST"]
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -69,7 +79,7 @@ io.on('connection', (socket) => {
 
 // CORS configuration
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true
 }));
