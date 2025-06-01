@@ -12,6 +12,10 @@ const { Server } = require("socket.io");
 const swaggerUi = require('swagger-ui-express');
 const { publicSpecs, adminSpecs, notifSpecs, allSpecs } = require('./swagger-config');
 const auth = require('./middleware/auth');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const rateLimit = require('express-rate-limit');
 
 // Initialize Express app
 const app = express();
@@ -85,7 +89,10 @@ app.use(cors({
 }));
 
 // Middleware
-app.use(express.json());
+app.use(helmet());
+app.use(mongoSanitize());
+app.use(xss());
+app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // --- Make io accessible in routes ---
@@ -132,5 +139,13 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: 'Trop de tentatives, réessayez plus tard.'
+});
+app.use('/api/auth/login', loginLimiter);
+app.use('/api/admin/login', loginLimiter);
 
 startServer(); 
