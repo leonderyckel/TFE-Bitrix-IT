@@ -130,7 +130,7 @@ const startServer = async () => {
     
     const PORT = process.env.PORT || 5001;
     // Use the HTTP server to listen, not the Express app directly
-    server.listen(PORT, '0.0.0.0',  () => { 
+    server.listen(PORT, () => { 
       console.log(`Server is running on port ${PORT}`);
       console.log('Socket.IO server initialized and listening.');
     });
