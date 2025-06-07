@@ -21,5 +21,11 @@ jobs:
     - name: Install dependencies
       run: npm install
 
+    - name: Start backend server
+      run: npm start &
+
+    - name: Wait for server to be ready
+      run: npx wait-on http://localhost:5001
+
     - name: Run backend tests
       run: npm test tests/ 
