@@ -9,6 +9,21 @@ on:
 jobs:
   build-and-test:
     runs-on: self-hosted
+    env:
+      PORT: 5001
+      MONGODB_ADMIN_URI: ${{ secrets.MONGODB_ADMIN_URI }}
+      MONGODB_PUBLIC_URI: ${{ secrets.MONGODB_PUBLIC_URI }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      CLIENT_URL: ${{ secrets.CLIENT_URL }}
+      MQTT_BROKER_URL: ${{ secrets.MQTT_BROKER_URL }}
+      EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+      EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
+      EMAIL_SECURE: ${{ secrets.EMAIL_SECURE }}
+      EMAIL_USER: ${{ secrets.EMAIL_USER }}
+      EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+      FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
 
     steps:
     - uses: actions/checkout@v3
@@ -28,4 +43,4 @@ jobs:
       run: npx wait-on http://localhost:5001
 
     - name: Run backend tests
-      run: npm test tests/ 
+      run: npm test tests/
