@@ -53,5 +53,8 @@ jobs:
     - name: Start backend server
       run: npm start &
 
-    - name: Run backend tests
-      run: npm test tests/
+    - name: Run integration tests
+      run: npm test tests/integration/
+
+    - name: Run security tests
+      run: npm test tests/security/
