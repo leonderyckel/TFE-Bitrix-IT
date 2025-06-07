@@ -36,6 +36,20 @@ jobs:
     - name: Install dependencies
       run: npm install
 
+    - name: Debug environment variables
+      run: |
+        echo "Checking MongoDB URIs..."
+        if [ -n "$MONGODB_ADMIN_URI" ]; then
+          echo "MONGODB_ADMIN_URI is set"
+        else
+          echo "MONGODB_ADMIN_URI is empty"
+        fi
+        if [ -n "$MONGODB_PUBLIC_URI" ]; then
+          echo "MONGODB_PUBLIC_URI is set"
+        else
+          echo "MONGODB_PUBLIC_URI is empty"
+        fi
+
     - name: Start backend server
       run: npm start &
 
