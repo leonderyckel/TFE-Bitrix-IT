@@ -7,57 +7,81 @@ on:
     branches: [ main ]
 
 jobs:
-  build-and-test:
+  build:
     runs-on: self-hosted
     env:
       PORT: 5001
       MONGODB_ADMIN_URI: ${{ secrets.MONGODB_ADMIN_URI }}
       MONGODB_PUBLIC_URI: ${{ secrets.MONGODB_PUBLIC_URI }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
-      CLIENT_URL: ${{ secrets.CLIENT_URL }}
-      MQTT_BROKER_URL: ${{ secrets.MQTT_BROKER_URL }}
-      EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
-      EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
-      EMAIL_SECURE: ${{ secrets.EMAIL_SECURE }}
-      EMAIL_USER: ${{ secrets.EMAIL_USER }}
-      EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
-      FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
-
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm install
 
-    - name: Use Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
+  unit:
+    runs-on: self-hosted
+    needs: build
+    env:
+      PORT: 5001
+      MONGODB_ADMIN_URI: ${{ secrets.MONGODB_ADMIN_URI }}
+      MONGODB_PUBLIC_URI: ${{ secrets.MONGODB_PUBLIC_URI }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm install
+      - name: Start backend server
+        run: npm start &
+      - name: Run unit tests
+        run: npm test tests/unit/
 
-    - name: Install dependencies
-      run: npm install
+  integration:
+    runs-on: self-hosted
+    needs: unit
+    env:
+      PORT: 5001
+      MONGODB_ADMIN_URI: ${{ secrets.MONGODB_ADMIN_URI }}
+      MONGODB_PUBLIC_URI: ${{ secrets.MONGODB_PUBLIC_URI }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm install
+      - name: Start backend server
+        run: npm start &
+      - name: Run integration tests
+        run: npm test tests/integration/
 
-    - name: Debug environment variables
-      run: |
-        echo "Checking MongoDB URIs..."
-        if [ -n "$MONGODB_ADMIN_URI" ]; then
-          echo "MONGODB_ADMIN_URI is set"
-        else
-          echo "MONGODB_ADMIN_URI is empty"
-        fi
-        if [ -n "$MONGODB_PUBLIC_URI" ]; then
-          echo "MONGODB_PUBLIC_URI is set"
-        else
-          echo "MONGODB_PUBLIC_URI is empty"
-        fi
-
-    - name: Start backend server
-      run: npm start &
-
-    - name: Run unit tests
-      run: npm test tests/unit/
-
-    - name: Run integration tests
-      run: npm test tests/integration/
-
-    - name: Run security tests
-      run: npm test tests/security/
+  security:
+    runs-on: self-hosted
+    needs: integration
+    env:
+      PORT: 5001
+      MONGODB_ADMIN_URI: ${{ secrets.MONGODB_ADMIN_URI }}
+      MONGODB_PUBLIC_URI: ${{ secrets.MONGODB_PUBLIC_URI }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm install
+      - name: Start backend server
+        run: npm start &
+      - name: Run security tests
+        run: npm test tests/security/
