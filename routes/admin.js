@@ -718,7 +718,7 @@ router.post('/tickets/:id/comments', async (req, res) => {
         .populate({ // Keep technician populated for WS event consistency
             path: 'technician',
             select: '_id firstName lastName email',
-            model: AdminUser // Use AdminUser model for population
+            model: global.models.AdminUser // Correction ici : utiliser le modèle de la bonne connexion
          })
         .lean();
 
