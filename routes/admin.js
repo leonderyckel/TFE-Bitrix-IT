@@ -412,6 +412,12 @@ router.post('/tickets/:id/progress', async (req, res) => {
          })
         .lean();
 
+      // Peuplement manuel du technicien si présent
+      if (updatedTicket && updatedTicket.technician) {
+        const technician = await AdminUser.findById(updatedTicket.technician).select('_id firstName lastName email').lean();
+        updatedTicket.technician = technician;
+      }
+
       // Define notificationText BEFORE emitting
       let notificationText = '';
       if (status === 'assigned') {
@@ -722,25 +728,30 @@ router.post('/tickets/:id/comments', async (req, res) => {
          })
         .lean();
 
+      // Peuplement manuel du technicien si présent
+      if (updatedTicket && updatedTicket.technician) {
+        const technician = await AdminUser.findById(updatedTicket.technician).select('_id firstName lastName email').lean();
+        updatedTicket.technician = technician;
+      }
+
       if (!updatedTicket) {
         console.error(`[Admin Comment] CRITICAL: Ticket ${ticketId} not found AFTER saving comment!`);
         throw new Error('Ticket not found after saving admin comment');
       }
       console.log(`[Admin Comment] Ticket ${ticketId} populated. Client: ${updatedTicket.client?._id}, Technician: ${updatedTicket.technician?._id}`);
 
+      // Prepare notification details
+      const commenterName = req.admin.firstName || 'Admin/Technician';
+      const notificationText = `New comment from ${commenterName} on ticket ${updatedTicket.title || 'untitled'}`;
+
       // Emit WebSocket event first
       if (req.io) {
-        // Include notification text in the payload
         req.io.to(ticketId).emit('ticket:updated', { ...updatedTicket, notificationText });
         console.log(`[Admin Comment] Emitted ticket:updated event to room ${ticketId}`);
       } else {
         console.error('[Admin Comment] req.io not found.');
       }
 
-      // Prepare notification details
-      const commenterName = req.admin.firstName || 'Admin/Technician';
-      // Use English and specific format, no ID
-      const notificationText = `New comment from ${commenterName} on ticket ${updatedTicket.title || 'untitled'}`;
       const notificationLink = `/tickets/${ticketId}`;
       console.log(`[Admin Comment] Preparing notification. Text: "${notificationText}", Link: ${notificationLink}`);
 
@@ -890,6 +901,12 @@ router.post('/tickets/:id/assign', async (req, res) => {
          })
         .lean();
 
+      // Peuplement manuel du technicien si présent
+      if (updatedTicket && updatedTicket.technician) {
+        const technician = await AdminUser.findById(updatedTicket.technician).select('_id firstName lastName email').lean();
+        updatedTicket.technician = technician;
+      }
+
       if (!updatedTicket) {
          console.error(`[Assign] CRITICAL: Failed to fetch updated ticket ${ticketId} after assignment save.`);
          // Still send response, but log critical error
@@ -1036,6 +1053,12 @@ router.post('/tickets/:id/cancel', async (req, res) => {
            })
           .lean();
 
+        // Peuplement manuel du technicien si présent
+        if (updatedTicket && updatedTicket.technician) {
+          const technician = await AdminUser.findById(updatedTicket.technician).select('_id firstName lastName email').lean();
+          updatedTicket.technician = technician;
+        }
+
         if (updatedTicket) {
             // Emit WebSocket first
             if (req.io) {
@@ -1156,6 +1179,12 @@ router.post('/tickets/:id/close', async (req, res) => {
               model: AdminUser // Use AdminUser model
            })
           .lean();
+
+        // Peuplement manuel du technicien si présent
+        if (updatedTicket && updatedTicket.technician) {
+          const technician = await AdminUser.findById(updatedTicket.technician).select('_id firstName lastName email').lean();
+          updatedTicket.technician = technician;
+        }
 
         if (updatedTicket) {
             // Emit WebSocket first
