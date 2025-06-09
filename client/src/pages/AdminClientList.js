@@ -11,7 +11,8 @@ import {
   Grid,
   Select,
   InputLabel,
-  FormControl
+  FormControl,
+  Checkbox
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -49,6 +50,9 @@ function AdminClientList() {
   const [selectedClient, setSelectedClient] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [formSubmitting, setFormSubmitting] = useState(false);
+  const [setCompanySubmitting, setSetCompanySubmitting] = useState(false);
+  const [setCompanyError, setSetCompanyError] = useState(null);
+  const [setCompanyChecked, setSetCompanyChecked] = useState(false);
 
   const [nameSearch, setNameSearch] = useState('');
   const [companyFilter, setCompanyFilter] = useState('');
@@ -211,6 +215,31 @@ function AdminClientList() {
       setApiActionError(err.response?.data?.message || 'Failed to delete client.');
     } finally {
       setFormSubmitting(false);
+    }
+  };
+
+  // Fonction pour définir le nom officiel d'entreprise (appelée quand on coche la case)
+  const handleSetCompanyNameCheckbox = async (event) => {
+    const checked = event.target.checked;
+    setSetCompanyChecked(checked);
+    setSetCompanySubmitting(true);
+    setSetCompanyError(null);
+    if (checked) {
+      try {
+        await axios.post(`${API_URL}/admin/clients/set-company-name`, {
+          companyKey: formik.values.company && selectedClient?.companyKey,
+          newCompanyName: formik.values.company
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        fetchClients();
+      } catch (err) {
+        setSetCompanyError(err.response?.data?.message || 'Failed to set company name.');
+      } finally {
+        setSetCompanySubmitting(false);
+      }
+    } else {
+      setSetCompanySubmitting(false);
     }
   };
 
@@ -398,6 +427,23 @@ function AdminClientList() {
                 error={formik.touched.company && Boolean(formik.errors.company)}
                 helperText={formik.touched.company && formik.errors.company}
              />
+             {isEditing && selectedClient?.companyKey && (
+               <Box sx={{ mt: 1, mb: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+                 <FormControlLabel
+                   control={
+                     <Checkbox
+                       checked={setCompanyChecked}
+                       onChange={handleSetCompanyNameCheckbox}
+                       color="primary"
+                       disabled={setCompanySubmitting || !formik.values.company}
+                     />
+                   }
+                   label="Set as official company name"
+                 />
+                 {setCompanySubmitting && <CircularProgress size={18} />}
+                 {setCompanyError && <Typography color="error" variant="body2">{setCompanyError}</Typography>}
+               </Box>
+             )}
              <TextField
                 margin="dense"
                 id="address"

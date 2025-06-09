@@ -1,5 +1,6 @@
 const { getModels } = require('../models');
 const jwt = require('jsonwebtoken');
+const { normalizeCompanyName } = require('../utils/normalizeCompany');
 
 // Generate JWT token
 const generateToken = (id, isAdmin = false) => {
@@ -50,12 +51,21 @@ exports.register = async (req, res) => {
     }
 
     // Create regular user (always client role)
+    const companyKey = company ? normalizeCompanyName(company) : undefined;
+    let companyNameToUse = company;
+    if (companyKey) {
+      const existingCompanyUser = await User.findOne({ companyKey });
+      if (existingCompanyUser && existingCompanyUser.company) {
+        companyNameToUse = existingCompanyUser.company;
+      }
+    }
     const user = await User.create({
       email,
       password,
       firstName,
       lastName,
-      company,
+      company: companyNameToUse,
+      companyKey,
       address
     });
 

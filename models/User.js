@@ -36,6 +36,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  companyKey: {
+    type: String,
+    trim: true,
+    index: true
+  },
   address: {
     type: String,
     trim: true

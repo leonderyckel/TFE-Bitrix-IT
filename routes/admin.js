@@ -5,6 +5,7 @@ const { getModels } = require('../models');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const nodemailer = require('nodemailer');
+const { normalizeCompanyName } = require('../utils/normalizeCompany');
 
 /**
  * @swagger
@@ -1297,7 +1298,7 @@ router.get('/clients', async (req, res) => {
     // Récupérer uniquement les utilisateurs avec le rôle 'client'
     // Sélectionnez les champs nécessaires pour l'affichage (id, nom, email)
     const clients = await User.find({ role: 'client' })
-                          .select('_id firstName lastName email company address isCompanyBoss') // Added isCompanyBoss
+                          .select('_id firstName lastName email company companyKey address isCompanyBoss') // Ajout de companyKey
                           .lean();
     
     res.json(clients);
@@ -2398,12 +2399,14 @@ router.post('/clients', async (req, res) => {
     if (existingUser || existingAdmin) {
       return res.status(400).json({ message: 'User with this email already exists.' });
     }
+    const companyKey = company ? normalizeCompanyName(company) : undefined;
     const newUser = await User.create({
       email,
       password,
       firstName,
       lastName,
       company,
+      companyKey,
       address,
       role: 'client'
     });
@@ -2422,6 +2425,24 @@ router.post('/clients', async (req, res) => {
       return res.status(400).json({ message: 'Validation Error', errors: error.errors });
     }
     res.status(500).json({ message: 'Server error while creating client', error: error.message });
+  }
+});
+
+// Définir le nom officiel d'une entreprise pour tous les clients ayant la même companyKey
+router.post('/clients/set-company-name', async (req, res) => {
+  try {
+    const { companyKey, newCompanyName } = req.body;
+    if (!companyKey || !newCompanyName) {
+      return res.status(400).json({ message: 'companyKey and newCompanyName are required' });
+    }
+    const { User } = require('../models').getModels();
+    const result = await User.updateMany(
+      { companyKey },
+      { $set: { company: newCompanyName } }
+    );
+    res.json({ message: 'Company name updated for all matching clients', modifiedCount: result.modifiedCount });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating company name', error: error.message });
   }
 });
 
