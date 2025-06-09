@@ -1454,16 +1454,18 @@ router.get('/calendar-tickets', async (req, res) => {
         const clientName = ticket.client ? `${ticket.client.firstName} ${ticket.client.lastName}` : 'N/A';
         const ticketTitle = ticket.title;
         const technicianId = ticket.technician ? ticket.technician.toString() : null;
+        const clientAddress = ticket.client && ticket.client.address ? ticket.client.address : null;
         events.push({
           id: ticket._id,
-          title: `${clientName} - ${ticketTitle}`, // Keep original title for basic tooltip/accessibility
+          title: `${clientName} - ${ticketTitle}`,
           clientName: clientName,
           ticketTitle: ticketTitle,
-          start: latestScheduledProgress.scheduledDate, // Utiliser la date trouvée
-          end: new Date(latestScheduledProgress.scheduledDate.getTime() + 60 * 60 * 1000), // Ajouter 1h pour l'affichage
-          description: latestScheduledProgress.description || 'Scheduled event', // Utiliser la description du progrès
-          resource: { ticketId: ticket._id }, // Ressource optionnelle
-          technicianId: technicianId
+          start: latestScheduledProgress.scheduledDate,
+          end: new Date(latestScheduledProgress.scheduledDate.getTime() + 60 * 60 * 1000),
+          description: latestScheduledProgress.description || 'Scheduled event',
+          resource: { ticketId: ticket._id },
+          technicianId: technicianId,
+          clientAddress: clientAddress
         });
       }
     });
