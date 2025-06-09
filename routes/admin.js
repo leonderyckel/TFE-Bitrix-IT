@@ -1431,7 +1431,7 @@ router.get('/calendar-tickets', async (req, res) => {
         }
       }
     })
-    .populate('client', 'firstName lastName') // Populater le client pour le titre
+    .populate('client', 'firstName lastName address') // Populater le client pour le titre et l'adresse
     .select('title client progress technician'); // Sélectionner les champs nécessaires + technician
 
     console.log(`[Calendar] Found ${tickets.length} potential tickets`); // Log number of tickets found
@@ -1454,6 +1454,7 @@ router.get('/calendar-tickets', async (req, res) => {
         const clientName = ticket.client ? `${ticket.client.firstName} ${ticket.client.lastName}` : 'N/A';
         const ticketTitle = ticket.title;
         const technicianId = ticket.technician ? ticket.technician.toString() : null;
+        const clientAddress = ticket.client && ticket.client.address ? ticket.client.address : null;
         events.push({
           id: ticket._id,
           title: `${clientName} - ${ticketTitle}`, // Keep original title for basic tooltip/accessibility
@@ -1463,7 +1464,8 @@ router.get('/calendar-tickets', async (req, res) => {
           end: new Date(latestScheduledProgress.scheduledDate.getTime() + 60 * 60 * 1000), // Ajouter 1h pour l'affichage
           description: latestScheduledProgress.description || 'Scheduled event', // Utiliser la description du progrès
           resource: { ticketId: ticket._id }, // Ressource optionnelle
-          technicianId: technicianId
+          technicianId: technicianId,
+          clientAddress: clientAddress // Ajout de l'adresse du client
         });
       }
     });

@@ -6,7 +6,7 @@ import {
   Box, Container, Typography, CircularProgress, Alert, useTheme,
   GlobalStyles, alpha,
   FormControl, FormGroup, FormControlLabel, Checkbox,
-  List, ListItem, ListSubheader
+  List, ListItem, ListSubheader, Tooltip
 } from '@mui/material';
 import axios from 'axios';
 import API_URL from '../config/api';
@@ -14,6 +14,8 @@ import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import PlaceIcon from '@mui/icons-material/Place';
 
 // Setup the localizer by providing the moment (or dayjs) library
 const localizer = dayjsLocalizer(dayjs);
@@ -29,29 +31,93 @@ const defaultColor = '#cccccc'; // Gris clair pour non assigné
 const CustomEvent = ({ event, style }) => {
   const theme = useTheme();
   const startTime = dayjs(event.start).format('HH:mm');
-  // Use background color from style prop IF PROVIDED, otherwise default (should always be provided now)
   const backgroundColor = style?.backgroundColor || defaultColor; 
   const textColor = theme.palette.getContrastText(backgroundColor);
 
-  return (
-    <Box sx={{ 
-      width: '100%', 
-      height: '100%',
-      p: '1px 4px',
-      // bgcolor: backgroundColor, // REMOVED - Let the container style (from eventPropGetter) handle this
-      color: textColor, 
-      borderRadius: '4px', 
-      fontSize: '0.7rem',
-      overflow: 'hidden',
-      display: 'flex',
-      alignItems: 'center',
-      lineHeight: 1.2, 
-      boxSizing: 'border-box'
-    }}>
-      <Typography variant="caption" sx={{ fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'inherit' }}>
-        {startTime} {event.ticketTitle}
-      </Typography>
+  // Nouveau style pour le tooltip avec icônes et couleurs
+  const tooltipContent = (
+    <Box 
+      sx={{
+        p: 2,
+        bgcolor: 'background.paper',
+        color: 'text.primary',
+        borderRadius: 3,
+        boxShadow: 4,
+        minWidth: 240,
+        maxWidth: 340,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+        pointerEvents: 'auto'
+      }}
+      onClick={e => e.stopPropagation()}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography variant="subtitle2" fontWeight="bold" sx={{ color: theme.palette.primary.main }}>
+          {event.clientName} - {event.ticketTitle}
+        </Typography>
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <AccessTimeIcon fontSize="small" sx={{ color: theme.palette.warning.main }} />
+        <Typography variant="body2" sx={{ color: theme.palette.grey[800], fontWeight: 500 }}>
+          {dayjs(event.start).format('DD/MM/YY, HH:mm')}
+        </Typography>
+      </Box>
+      {event.clientAddress && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <PlaceIcon fontSize="small" sx={{ color: theme.palette.success.main }} />
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.clientAddress)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: theme.palette.primary.main, textDecoration: 'underline', fontWeight: 500 }}
+          >
+            {event.clientAddress}
+          </a>
+        </Box>
+      )}
     </Box>
+  );
+
+  return (
+    <Tooltip 
+      title={tooltipContent} 
+      arrow 
+      placement="top"
+      enterDelay={200} 
+      leaveDelay={100}
+      componentsProps={{
+        tooltip: {
+          sx: {
+            p: 0,
+            bgcolor: 'transparent',
+            boxShadow: 'none',
+            maxWidth: 'none',
+            pointerEvents: 'none',
+          }
+        }
+      }}
+    >
+      <Box sx={{ 
+        width: '100%', 
+        height: '100%',
+        p: '1px 4px',
+        color: textColor, 
+        borderRadius: '4px', 
+        fontSize: '0.7rem',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        lineHeight: 1.2, 
+        boxSizing: 'border-box',
+        cursor: 'pointer',
+        pointerEvents: 'auto'
+      }}>
+        <Typography variant="caption" sx={{ fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'inherit' }}>
+          {startTime} {event.ticketTitle}
+        </Typography>
+      </Box>
+    </Tooltip>
   );
 };
 
@@ -264,7 +330,8 @@ function AdminCalendarView() {
           end: dayjs(eventData.start).add(1, 'hour').toDate(),
           resource: eventData.resource,
           description: eventData.description,
-          technicianId: eventData.technicianId
+          technicianId: eventData.technicianId,
+          clientAddress: eventData.clientAddress
         }));
         setEvents(formattedEvents);
       } catch (err) {
@@ -367,6 +434,13 @@ function AdminCalendarView() {
     return false;
   });
 
+  const tooltipAccessor = (event) => {
+    let info = `${event.clientName ? event.clientName + ' - ' : ''}${event.ticketTitle || ''}`;
+    if (event.description) info += `\n${event.description}`;
+    if (event.clientAddress) info += `\nAdresse: ${event.clientAddress}`;
+    return info;
+  };
+
   return (
     <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
       {calendarGlobalStyles}
@@ -438,7 +512,6 @@ function AdminCalendarView() {
               endAccessor="end"
               style={{ height: '100%' }}
               onSelectEvent={handleSelectEvent}
-              tooltipAccessor={(event) => `${event.clientName} - ${event.ticketTitle}\n${event.description}`}
               views={['month', 'week', 'day']}
               eventPropGetter={eventStyleGetter}
               components={{
