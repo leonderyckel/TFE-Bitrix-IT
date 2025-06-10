@@ -6,6 +6,9 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const nodemailer = require('nodemailer');
 const { normalizeCompanyName } = require('../utils/normalizeCompany');
+const fs = require('fs');
+const path = require('path');
+const Handlebars = require('handlebars');
 
 /**
  * @swagger
@@ -2456,6 +2459,59 @@ router.get('/billing/closed-tickets', async (req, res) => {
   } catch (error) {
     console.error('Error fetching closed tickets for billing:', error);
     res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Aperçu HTML de la facture pour un ticket donné
+router.get('/invoice/preview/:ticketId', async (req, res) => {
+  try {
+    const { Ticket, User } = getModels();
+    const ticket = await Ticket.findById(req.params.ticketId).populate('client');
+    if (!ticket) return res.status(404).send('Ticket not found');
+
+    // Lis le template HTML
+    const templatePath = path.join(__dirname, '../templates/invoiceTemplate.html');
+    const templateSource = fs.readFileSync(templatePath, 'utf8');
+    const template = Handlebars.compile(templateSource);
+
+    // Prépare les données à injecter
+    const client = ticket.client || {};
+    const data = {
+      companyName: 'Bitrix IT CC',
+      companyAddress: '3A Kariga Street<br>Stikland Industrial<br>Western Cape<br>7530',
+      companyVAT: '4440316406',
+      clientName: client.firstName ? `${client.firstName} ${client.lastName}` : '',
+      clientAddress: client.address || '',
+      clientVAT: client.vat || '',
+      invoiceNumber: `INA${ticket._id.toString().slice(-6).toUpperCase()}`,
+      date: new Date().toLocaleDateString(),
+      dueDate: new Date().toLocaleDateString(),
+      reference: ticket.title,
+      salesRep: ticket.technician ? ticket.technician.firstName + ' ' + ticket.technician.lastName : '',
+      discount: ticket.invoice?.discount || 0,
+      items: [
+        {
+          description: ticket.title,
+          subDescription: ticket.description,
+          quantity: 1,
+          unitPrice: ticket.invoice?.amount || 0,
+          total: ticket.invoice?.amount || 0
+        }
+      ],
+      totalDiscount: 0,
+      totalExclusive: ticket.invoice?.amount || 0,
+      totalVAT: 0,
+      subTotal: ticket.invoice?.amount || 0,
+      totalDue: ticket.invoice?.amount || 0,
+      notes: 'Bénéficiaire: Bitrix IT<br>BANK: StandardBank Tyger Manor<br>BRANCH CODE: 050410<br>ACCOUNT NUMBER: 401823768',
+      bankDetails: ''
+    };
+
+    const html = template(data);
+    res.send(html);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Erreur serveur');
   }
 });
 

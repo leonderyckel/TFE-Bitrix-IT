@@ -10,7 +10,8 @@ import {
   TableRow,
   Paper,
   Button,
-  CircularProgress
+  CircularProgress,
+  Dialog
 } from '@mui/material';
 import axios from 'axios';
 import API_URL from '../config/api';
@@ -19,6 +20,9 @@ const AdminBilling = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [invoiceHtml, setInvoiceHtml] = useState('');
+  const [loadingInvoice, setLoadingInvoice] = useState(false);
 
   useEffect(() => {
     const fetchClosedTickets = async () => {
@@ -37,6 +41,22 @@ const AdminBilling = () => {
     };
     fetchClosedTickets();
   }, []);
+
+  const handleShowInvoice = async (ticketId) => {
+    setLoadingInvoice(true);
+    setShowInvoice(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_URL}/admin/invoice/preview/${ticketId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setInvoiceHtml(res.data.html || res.data); // selon la structure de la réponse
+    } catch (err) {
+      setInvoiceHtml('<div style="padding:40px;color:red;">Erreur lors du chargement de la facture.</div>');
+    } finally {
+      setLoadingInvoice(false);
+    }
+  };
 
   return (
     <Box sx={{ p: 4 }}>
@@ -67,7 +87,12 @@ const AdminBilling = () => {
                   <TableCell>{ticket.client?.company || 'N/A'}</TableCell>
                   <TableCell>{ticket.updatedAt ? new Date(ticket.updatedAt).toLocaleDateString() : 'N/A'}</TableCell>
                   <TableCell>
-                    <Button variant="contained" color="primary" size="small" disabled>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      size="small"
+                      onClick={() => handleShowInvoice(ticket._id)}
+                    >
                       Invoice
                     </Button>
                   </TableCell>
@@ -77,6 +102,16 @@ const AdminBilling = () => {
           </Table>
         </TableContainer>
       )}
+      <Dialog open={showInvoice} onClose={() => setShowInvoice(false)} maxWidth="lg" fullWidth>
+        {loadingInvoice ? (
+          <div style={{ padding: 40, textAlign: 'center' }}><CircularProgress /></div>
+        ) : (
+          <div
+            style={{ minHeight: 600, background: '#e5e5e5' }}
+            dangerouslySetInnerHTML={{ __html: invoiceHtml }}
+          />
+        )}
+      </Dialog>
     </Box>
   );
 };
