@@ -2446,4 +2446,17 @@ router.post('/clients/set-company-name', async (req, res) => {
   }
 });
 
+// GET /api/admin/billing/closed-tickets
+router.get('/billing/closed-tickets', async (req, res) => {
+  try {
+    const { Ticket } = getModels();
+    const closedTickets = await Ticket.find({ status: 'closed' })
+      .populate('client', 'firstName lastName email address company');
+    res.json(closedTickets);
+  } catch (error) {
+    console.error('Error fetching closed tickets for billing:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
 module.exports = router; 

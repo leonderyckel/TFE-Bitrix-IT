@@ -30,7 +30,8 @@ import {
   CalendarMonth as CalendarMonthIcon,
   Notifications as NotificationsIcon,
   Menu as MenuIcon,
-  Business as CompanyIcon
+  Business as CompanyIcon,
+  Receipt as ReceiptIcon
 } from '@mui/icons-material';
 import { logout } from '../store/slices/authSlice';
 import { 
@@ -135,6 +136,7 @@ const Layout = () => {
     { text: 'Calendar', icon: <CalendarMonthIcon />, path: '/admin/calendar' },
     { text: 'Clients', icon: <ClientsIcon />, path: '/admin/clients' },
     { text: 'Companies', icon: <CompanyIcon />, path: '/admin/companies' },
+    { text: 'Billing', icon: <ReceiptIcon />, path: '/admin/billing' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' }
   ] : [
     { text: 'Tickets', icon: <SupportIcon />, path: '/tickets' },
