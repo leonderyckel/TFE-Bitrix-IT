@@ -2478,7 +2478,12 @@ router.get('/invoice/preview/:ticketId', async (req, res) => {
     const client = ticket.client || {};
     const data = {
       companyName: 'Bitrix IT CC',
-      companyAddress: '3A Kariga Street<br>Stikland Industrial<br>Western Cape<br>7530',
+      companyAddress: [
+        '3A Kariga Street',
+        'Stikland Industrial',
+        'Western Cape',
+        '7530'
+      ],
       companyVAT: '4440316406',
       clientName: client.firstName ? `${client.firstName} ${client.lastName}` : '',
       clientAddress: client.address || '',

@@ -215,7 +215,9 @@
       <div class="header-row">
         <div class="company-block">
           <span class="company-name">{{companyName}}</span>
-          {{companyAddress}}<br>
+          {{#each companyAddress}}
+            {{this}}<br>
+          {{/each}}
           <span class="vat-label">VAT No:</span> {{companyVAT}}
         </div>
         <div class="logo-block">
