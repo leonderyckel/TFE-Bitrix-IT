@@ -102,12 +102,24 @@ const AdminBilling = () => {
           </Table>
         </TableContainer>
       )}
-      <Dialog open={showInvoice} onClose={() => setShowInvoice(false)} maxWidth="lg" fullWidth>
+      <Dialog
+        open={showInvoice}
+        onClose={() => setShowInvoice(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          style: {
+            background: '#e5e5e5',
+            minHeight: '100vh',
+            boxShadow: 'none'
+          }
+        }}
+      >
         {loadingInvoice ? (
           <div style={{ padding: 40, textAlign: 'center' }}><CircularProgress /></div>
         ) : (
           <div
-            style={{ minHeight: 600, background: '#e5e5e5' }}
+            style={{ minHeight: 600, background: 'none' }}
             dangerouslySetInnerHTML={{ __html: invoiceHtml }}
           />
         )}

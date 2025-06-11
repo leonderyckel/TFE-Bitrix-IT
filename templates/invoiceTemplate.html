@@ -4,11 +4,54 @@
   <meta charset="utf-8" />
   <title>Tax Invoice</title>
   <style>
-    body {
+    @media print {
+      html, body {
+        width: 210mm;
+        height: 297mm;
+        margin: 0;
+        padding: 0;
+        background: #e5e5e5 !important;
+      }
+      .a4-page {
+        width: 210mm;
+        height: 297mm;
+        margin: 0;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        page-break-after: always;
+        background: #e5e5e5 !important;
+      }
+      .invoice-container {
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+      }
+    }
+    html, body {
       background: #e5e5e5;
+      min-height: 100vh;
+      min-width: 100vw;
+      width: 100vw;
+      height: 100vh;
       margin: 0;
-      padding: 32px 0;
+      padding: 0;
+      position: fixed;
+      top: 0;
+      left: 0;
       font-family: Arial, Helvetica, sans-serif;
+    }
+    .a4-page {
+      width: 210mm;
+      height: 297mm;
+      margin: 0 auto;
+      background: #fff;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: stretch;
     }
     .invoice-container {
       background: #fff;
@@ -17,6 +60,8 @@
       border-radius: 8px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.08);
       padding: 40px 48px 48px 48px;
+      min-height: 100%;
+      box-sizing: border-box;
     }
     .header-row {
       display: flex;
@@ -164,87 +209,89 @@
   </style>
 </head>
 <body>
-  <div class="invoice-container">
-    <div class="title">Tax Invoice</div>
-    <div class="header-row">
-      <div class="company-block">
-        <span class="company-name">{{companyName}}</span>
-        {{companyAddress}}<br>
-        <span class="vat-label">VAT No:</span> {{companyVAT}}
-      </div>
-      <div class="logo-block">
-        <img class="logo-img" src="https://i.imgur.com/anor60B.jpeg" alt="Bitrix Logo" />
-        <div class="invoice-info">
-          <div><span class="label">Number:</span> {{invoiceNumber}}</div>
-          <div><span class="label">Date:</span> {{date}}</div>
-          <div><span class="label">Page:</span> 1/1</div>
-          <div><span class="label">Reference:</span> {{reference}}</div>
-          <div><span class="label">Sales Rep:</span> {{salesRep}}</div>
-          <div><span class="label">Due Date:</span> {{dueDate}}</div>
-          <div><span class="label">Discount:</span> {{discount}}%</div>
+  <div class="a4-page">
+    <div class="invoice-container">
+      <div class="title">Tax Invoice</div>
+      <div class="header-row">
+        <div class="company-block">
+          <span class="company-name">{{companyName}}</span>
+          {{companyAddress}}<br>
+          <span class="vat-label">VAT No:</span> {{companyVAT}}
+        </div>
+        <div class="logo-block">
+          <img class="logo-img" src="https://i.imgur.com/anor60B.jpeg" alt="Bitrix Logo" />
+          <div class="invoice-info">
+            <div><span class="label">Number:</span> {{invoiceNumber}}</div>
+            <div><span class="label">Date:</span> {{date}}</div>
+            <div><span class="label">Page:</span> 1/1</div>
+            <div><span class="label">Reference:</span> {{reference}}</div>
+            <div><span class="label">Sales Rep:</span> {{salesRep}}</div>
+            <div><span class="label">Due Date:</span> {{dueDate}}</div>
+            <div><span class="label">Discount:</span> {{discount}}%</div>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="client-block">
-      <span class="client-name">{{clientName}}</span>
-      {{clientAddress}}<br>
-      <span class="vat-label">Customer VAT No:</span> {{clientVAT}}
-    </div>
-    <div class="table-section">
-      <table>
-        <thead>
+      <div class="client-block">
+        <span class="client-name">{{clientName}}</span>
+        {{clientAddress}}<br>
+        <span class="vat-label">Customer VAT No:</span> {{clientVAT}}
+      </div>
+      <div class="table-section">
+        <table>
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Quantity</th>
+              <th>Incl. Price</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each items}}
+            <tr>
+              <td>
+                <span class="desc-main">{{description}}</span>
+                {{#if subDescription}}
+                  <span class="desc-sub">{{subDescription}}</span>
+                {{/if}}
+              </td>
+              <td>{{quantity}}</td>
+              <td>{{unitPrice}}</td>
+              <td>{{total}}</td>
+            </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </div>
+      <div class="totals-section">
+        <table class="totals-table">
           <tr>
-            <th>Description</th>
-            <th>Quantity</th>
-            <th>Incl. Price</th>
-            <th>Total</th>
+            <td class="label">Total Discount:</td>
+            <td class="value">{{totalDiscount}}</td>
           </tr>
-        </thead>
-        <tbody>
-          {{#each items}}
           <tr>
-            <td>
-              <span class="desc-main">{{description}}</span>
-              {{#if subDescription}}
-                <span class="desc-sub">{{subDescription}}</span>
-              {{/if}}
-            </td>
-            <td>{{quantity}}</td>
-            <td>{{unitPrice}}</td>
-            <td>{{total}}</td>
+            <td class="label">Total Exclusive:</td>
+            <td class="value">{{totalExclusive}}</td>
           </tr>
-          {{/each}}
-        </tbody>
-      </table>
-    </div>
-    <div class="totals-section">
-      <table class="totals-table">
-        <tr>
-          <td class="label">Total Discount:</td>
-          <td class="value">{{totalDiscount}}</td>
-        </tr>
-        <tr>
-          <td class="label">Total Exclusive:</td>
-          <td class="value">{{totalExclusive}}</td>
-        </tr>
-        <tr>
-          <td class="label">Total VAT:</td>
-          <td class="value">{{totalVAT}}</td>
-        </tr>
-        <tr>
-          <td class="label">Sub Total:</td>
-          <td class="value">{{subTotal}}</td>
-        </tr>
-        <tr class="total-due-row">
-          <td class="label">Total Due:</td>
-          <td class="value">{{totalDue}}</td>
-        </tr>
-      </table>
-    </div>
-    <div class="notes-section">
-      <span class="label">Notes:</span>
-      {{notes}}<br>
-      {{bankDetails}}
+          <tr>
+            <td class="label">Total VAT:</td>
+            <td class="value">{{totalVAT}}</td>
+          </tr>
+          <tr>
+            <td class="label">Sub Total:</td>
+            <td class="value">{{subTotal}}</td>
+          </tr>
+          <tr class="total-due-row">
+            <td class="label">Total Due:</td>
+            <td class="value">{{totalDue}}</td>
+          </tr>
+        </table>
+      </div>
+      <div class="notes-section">
+        <span class="label">Notes:</span>
+        {{notes}}<br>
+        {{bankDetails}}
+      </div>
     </div>
   </div>
 </body>
