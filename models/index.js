@@ -5,6 +5,7 @@ const TicketSchema = require('./Ticket');
 const adminUserSchema = require('./AdminUser');
 const companySensitiveDataSchemaDefinition = require('./CompanySensitiveData');
 const NotificationSchemaDefinition = require('./Notification');
+const InvoiceCounterSchema = require('./InvoiceCounter');
 
 let models = null;
 
@@ -39,6 +40,7 @@ const initializeModels = async () => {
     const User = mainConnection.model('User', userMongooseSchema);
     const Ticket = mainConnection.model('Ticket', ticketMongooseSchema);
     const Notification = mainConnection.model('Notification', notificationMongooseSchema);
+    const InvoiceCounter = mainConnection.model('InvoiceCounter', InvoiceCounterSchema.schema);
 
     // Initialisation des modèles admin
     const AdminUser = adminConnection.model('AdminUser', adminUserMongooseSchema);
@@ -50,6 +52,7 @@ const initializeModels = async () => {
       AdminUser,
       CompanySensitiveData,
       Notification,
+      InvoiceCounter,
       mainConnection,
       adminConnection
     };

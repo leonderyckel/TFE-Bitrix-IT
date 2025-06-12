@@ -2465,9 +2465,13 @@ router.get('/billing/closed-tickets', async (req, res) => {
 // Aperçu HTML de la facture pour un ticket donné
 router.get('/invoice/preview/:ticketId', async (req, res) => {
   try {
-    const { Ticket, User } = getModels();
+    const { Ticket, User, InvoiceCounter } = getModels();
     const ticket = await Ticket.findById(req.params.ticketId).populate('client');
     if (!ticket) return res.status(404).send('Ticket not found');
+
+    // Numéro de facture incrémental
+    const nextNumber = await getNextInvoiceNumber(getModels);
+    const invoiceNumber = `INV${String(nextNumber).padStart(3, '0')}`;
 
     // Lis le template HTML
     const templatePath = path.join(__dirname, '../templates/invoiceTemplate.html');
@@ -2488,7 +2492,7 @@ router.get('/invoice/preview/:ticketId', async (req, res) => {
       clientName: client.firstName ? `${client.firstName} ${client.lastName}` : '',
       clientAddress: client.address || '',
       clientVAT: client.vat || '',
-      invoiceNumber: `INA${ticket._id.toString().slice(-6).toUpperCase()}`,
+      invoiceNumber,
       date: new Date().toLocaleDateString(),
       dueDate: new Date().toLocaleDateString(),
       reference: ticket.title,
@@ -2508,7 +2512,12 @@ router.get('/invoice/preview/:ticketId', async (req, res) => {
       totalVAT: 0,
       subTotal: ticket.invoice?.amount || 0,
       totalDue: ticket.invoice?.amount || 0,
-      notes: 'Bénéficiaire: Bitrix IT<br>BANK: StandardBank Tyger Manor<br>BRANCH CODE: 050410<br>ACCOUNT NUMBER: 401823768',
+      notes: [
+        'Bénéficiaire: Bitrix IT',
+        'BANK: StandardBank Tyger Manor',
+        'BRANCH CODE: 050410',
+        'ACCOUNT NUMBER: 401823768'
+      ],
       bankDetails: ''
     };
 
@@ -2519,5 +2528,16 @@ router.get('/invoice/preview/:ticketId', async (req, res) => {
     res.status(500).send('Erreur serveur');
   }
 });
+
+// Fonction pour obtenir le prochain numéro de facture incrémental
+async function getNextInvoiceNumber(getModels) {
+  const { InvoiceCounter } = getModels();
+  const counter = await InvoiceCounter.findOneAndUpdate(
+    { name: 'invoice' },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+  return counter.seq;
+}
 
 module.exports = router; 

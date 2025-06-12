@@ -10,7 +10,7 @@
         height: 297mm;
         margin: 0;
         padding: 0;
-        background: #e5e5e5 !important;
+        background: #fff !important;
       }
       .a4-page {
         width: 210mm;
@@ -19,7 +19,7 @@
         box-shadow: none !important;
         border-radius: 0 !important;
         page-break-after: always;
-        background: #e5e5e5 !important;
+        background: #fff !important;
       }
       .invoice-container {
         box-shadow: none !important;
@@ -55,11 +55,12 @@
     }
     .invoice-container {
       background: #fff;
-      max-width: 950px;
+      width: 100%;
+      max-width: none;
       margin: 0 auto;
       border-radius: 8px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-      padding: 40px 48px 48px 48px;
+      padding: 20px 32px;
       min-height: 100%;
       box-sizing: border-box;
     }
@@ -291,7 +292,9 @@
       </div>
       <div class="notes-section">
         <span class="label">Notes:</span>
-        {{notes}}<br>
+        {{#each notes}}
+          {{this}}<br>
+        {{/each}}
         {{bankDetails}}
       </div>
     </div>
