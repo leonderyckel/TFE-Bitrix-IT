@@ -9,6 +9,7 @@ const { normalizeCompanyName } = require('../utils/normalizeCompany');
 const fs = require('fs');
 const path = require('path');
 const Handlebars = require('handlebars');
+const fsPromises = require('fs').promises;
 
 /**
  * @swagger
@@ -2557,6 +2558,105 @@ router.post('/invoice', async (req, res) => {
   } catch (err) {
     console.error('Erreur lors de la création de la facture:', err);
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+
+// --- ROUTES FACTURES ---
+
+// Liste toutes les factures pour l'historique
+router.get('/invoices', async (req, res) => {
+  const { Invoice } = getModels();
+  try {
+    const invoices = await Invoice.find().sort({ date: -1 });
+    res.json(invoices);
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors du chargement des factures.' });
+  }
+});
+
+// Récupère une facture par son ID
+router.get('/invoice/:id', async (req, res) => {
+  const { Invoice } = getModels();
+  try {
+    const invoice = await Invoice.findById(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ message: 'Facture non trouvée.' });
+    }
+    res.json(invoice);
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors du chargement de la facture.' });
+  }
+});
+
+// Génère le HTML de la facture
+router.get('/invoice/html/:id', async (req, res) => {
+  const { Invoice, Ticket, User } = getModels();
+  try {
+    const invoice = await Invoice.findById(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ message: 'Facture non trouvée.' });
+    }
+    const ticket = await Ticket.findById(invoice.ticket);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket non trouvé.' });
+    }
+    const user = await User.findById(ticket.userId || ticket.client);
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé.' });
+    }
+    const templatePath = path.join(__dirname, '../templates/invoiceTemplate.html');
+    const templateSource = await fsPromises.readFile(templatePath, 'utf8');
+    const template = Handlebars.compile(templateSource);
+
+    // Prépare les données comme dans /preview
+    const client = user;
+    const data = {
+      companyName: invoice.companyName || 'Bitrix IT CC',
+      companyAddress: invoice.companyAddress || [
+        '3A Kariga Street',
+        'Stikland Industrial',
+        'Western Cape',
+        '7530'
+      ],
+      companyVAT: invoice.companyVAT || '4440316406',
+      clientName: invoice.clientName || (client.firstName ? `${client.firstName} ${client.lastName}` : ''),
+      clientAddress: invoice.clientAddress || client.address || '',
+      clientVAT: invoice.clientVAT || client.vat || '',
+      invoiceNumber: invoice.invoiceNumber,
+      date: invoice.date ? new Date(invoice.date).toLocaleDateString() : '',
+      dueDate: invoice.dueDate || '',
+      reference: invoice.reference || ticket.title,
+      salesRep: invoice.salesRep || '',
+      discount: invoice.discount || 0,
+      items: invoice.items || [
+        {
+          description: ticket.title,
+          subDescription: ticket.description,
+          quantity: 1,
+          unitPrice: invoice.amount || 0,
+          total: invoice.amount || 0
+        }
+      ],
+      totalDiscount: invoice.totalDiscount || 0,
+      totalExclusive: invoice.totalExclusive || 0,
+      totalVAT: invoice.totalVAT || 0,
+      subTotal: invoice.subTotal || 0,
+      totalDue: invoice.totalDue || 0,
+      notes: invoice.notes || [
+        'Bénéficiaire: Bitrix IT',
+        'BANK: StandardBank Tyger Manor',
+        'BRANCH CODE: 050410',
+        'ACCOUNT NUMBER: 401823768'
+      ],
+      bankDetails: invoice.bankDetails || '',
+      client: client._id || client,
+      ticket: ticket._id
+    };
+
+    const html = template(data);
+    res.send(html);
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors de la génération du HTML de la facture.' });
   }
 });
 
