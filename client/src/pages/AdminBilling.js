@@ -23,6 +23,7 @@ const AdminBilling = () => {
   const [showInvoice, setShowInvoice] = useState(false);
   const [invoiceHtml, setInvoiceHtml] = useState('');
   const [loadingInvoice, setLoadingInvoice] = useState(false);
+  const [invoiceData, setInvoiceData] = useState(null);
 
   useEffect(() => {
     const fetchClosedTickets = async () => {
@@ -50,11 +51,34 @@ const AdminBilling = () => {
       const res = await axios.get(`${API_URL}/admin/invoice/preview/${ticketId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setInvoiceHtml(res.data.html || res.data); // selon la structure de la réponse
+      if (res.data && typeof res.data === 'object' && res.data.html && res.data.data) {
+        setInvoiceHtml(res.data.html);
+        setInvoiceData(res.data.data);
+      } else {
+        setInvoiceHtml(res.data.html || res.data);
+        setInvoiceData(null);
+      }
     } catch (err) {
       setInvoiceHtml('<div style="padding:40px;color:red;">Erreur lors du chargement de la facture.</div>');
+      setInvoiceData(null);
     } finally {
       setLoadingInvoice(false);
+    }
+  };
+
+  const handleSaveInvoice = async () => {
+    if (!invoiceData) {
+      alert('Impossible de sauvegarder : données facture manquantes.');
+      return;
+    }
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_URL}/admin/invoice`, invoiceData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert('Facture enregistrée avec succès !');
+    } catch (err) {
+      alert('Erreur lors de l\'enregistrement de la facture.');
     }
   };
 
@@ -118,10 +142,20 @@ const AdminBilling = () => {
         {loadingInvoice ? (
           <div style={{ padding: 40, textAlign: 'center' }}><CircularProgress /></div>
         ) : (
-          <div
-            style={{ minHeight: 600, background: 'none' }}
-            dangerouslySetInnerHTML={{ __html: invoiceHtml }}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: 600, background: 'none' }}>
+            <div
+              style={{ width: '100%' }}
+              dangerouslySetInnerHTML={{ __html: invoiceHtml }}
+            />
+            <Button
+              variant="contained"
+              color="success"
+              sx={{ mt: 3, mb: 2 }}
+              onClick={handleSaveInvoice}
+            >
+              Enregistrer
+            </Button>
+          </div>
         )}
       </Dialog>
     </Box>

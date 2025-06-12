@@ -2518,11 +2518,13 @@ router.get('/invoice/preview/:ticketId', async (req, res) => {
         'BRANCH CODE: 050410',
         'ACCOUNT NUMBER: 401823768'
       ],
-      bankDetails: ''
+      bankDetails: '',
+      client: client._id || client,
+      ticket: ticket._id
     };
 
     const html = template(data);
-    res.send(html);
+    res.json({ html, data });
   } catch (err) {
     console.error(err);
     res.status(500).send('Erreur serveur');
@@ -2539,5 +2541,23 @@ async function getNextInvoiceNumber(getModels) {
   );
   return counter.seq;
 }
+
+router.post('/invoice', async (req, res) => {
+  try {
+    const { Invoice } = getModels();
+    const invoiceData = req.body;
+    // Vérifie qu'il n'y a pas déjà une facture avec ce numéro
+    const existing = await Invoice.findOne({ invoiceNumber: invoiceData.invoiceNumber });
+    if (existing) {
+      return res.status(400).json({ message: 'Invoice number already exists.' });
+    }
+    const invoice = new Invoice(invoiceData);
+    await invoice.save();
+    res.status(201).json(invoice);
+  } catch (err) {
+    console.error('Erreur lors de la création de la facture:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
 
 module.exports = router; 
