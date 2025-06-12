@@ -2610,6 +2610,24 @@ router.get('/invoice/html/:id', async (req, res) => {
 
     // Prépare les données comme dans /preview
     const client = user;
+    // On s'assure que chaque item est un objet plat
+    const items = ((invoice.items && invoice.items.length > 0)
+      ? invoice.items
+      : [{
+          description: ticket.title,
+          subDescription: ticket.description,
+          quantity: 1,
+          unitPrice: invoice.amount || 0,
+          total: invoice.amount || 0
+        }]
+    ).map(item => ({
+      description: item.description,
+      subDescription: item.subDescription,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      total: item.total
+    }));
+
     const data = {
       companyName: invoice.companyName || 'Bitrix IT CC',
       companyAddress: invoice.companyAddress || [
@@ -2628,15 +2646,7 @@ router.get('/invoice/html/:id', async (req, res) => {
       reference: invoice.reference || ticket.title,
       salesRep: invoice.salesRep || '',
       discount: invoice.discount || 0,
-      items: invoice.items || [
-        {
-          description: ticket.title,
-          subDescription: ticket.description,
-          quantity: 1,
-          unitPrice: invoice.amount || 0,
-          total: invoice.amount || 0
-        }
-      ],
+      items: items,
       totalDiscount: invoice.totalDiscount || 0,
       totalExclusive: invoice.totalExclusive || 0,
       totalVAT: invoice.totalVAT || 0,
