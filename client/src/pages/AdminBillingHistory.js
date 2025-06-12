@@ -60,34 +60,31 @@ const AdminBillingHistory = () => {
   };
 
   const handleDownloadInvoice = async (invoiceId) => {
-    let html = invoiceHtml;
-    // Si le HTML n'est pas chargé ou correspond à une autre facture, on le charge
-    if (!html || !showInvoice) {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get(`${API_URL}/admin/invoice/html/${invoiceId}`, {
-          headers: { Authorization: `Bearer ${token}` }
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_URL}/admin/invoice/html/${invoiceId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const html = res.data.html || res.data;
+      const a4 = document.createElement('div');
+      a4.innerHTML = html;
+      // Attendre que le logo soit chargé
+      const img = a4.querySelector('img.logo-img');
+      if (img && !img.complete) {
+        await new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
         });
-        html = res.data.html || res.data;
-      } catch (err) {
-        alert('Erreur lors du chargement de la facture.');
-        return;
       }
+      html2pdf().from(a4).set({
+        margin: 0,
+        filename: 'invoice.pdf',
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).save();
+    } catch (err) {
+      alert('Erreur lors du chargement de la facture.');
     }
-    let a4 = document.querySelector('#invoice-a4');
-    let element;
-    if (a4) {
-      element = a4;
-    } else {
-      element = document.createElement('div');
-      element.innerHTML = html;
-    }
-    html2pdf().from(element).set({
-      margin: 0,
-      filename: 'invoice.pdf',
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).save();
   };
 
   return (
