@@ -59,14 +59,28 @@ const AdminBillingHistory = () => {
     }
   };
 
-  const handleDownloadInvoice = () => {
+  const handleDownloadInvoice = async (invoiceId) => {
+    let html = invoiceHtml;
+    // Si le HTML n'est pas chargé ou correspond à une autre facture, on le charge
+    if (!html || !showInvoice) {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await axios.get(`${API_URL}/admin/invoice/html/${invoiceId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        html = res.data.html || res.data;
+      } catch (err) {
+        alert('Erreur lors du chargement de la facture.');
+        return;
+      }
+    }
     let a4 = document.querySelector('#invoice-a4');
     let element;
     if (a4) {
       element = a4;
     } else {
       element = document.createElement('div');
-      element.innerHTML = invoiceHtml;
+      element.innerHTML = html;
     }
     html2pdf().from(element).set({
       margin: 0,
@@ -116,7 +130,7 @@ const AdminBillingHistory = () => {
                       variant="outlined"
                       color="secondary"
                       size="small"
-                      onClick={handleDownloadInvoice}
+                      onClick={() => handleDownloadInvoice(invoice._id)}
                     >
                       Télécharger
                     </Button>
