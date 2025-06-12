@@ -135,7 +135,10 @@ const AdminBilling = () => {
           style: {
             background: '#e5e5e5',
             minHeight: '100vh',
-            boxShadow: 'none'
+            width: '100vw',
+            boxShadow: 'none',
+            margin: 0,
+            padding: 0
           }
         }}
       >
