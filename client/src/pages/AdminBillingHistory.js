@@ -60,13 +60,18 @@ const AdminBillingHistory = () => {
   };
 
   const handleDownloadInvoice = () => {
-    if (!invoiceHtml) return;
-    const element = document.createElement('div');
-    element.innerHTML = invoiceHtml;
+    let a4 = document.querySelector('#invoice-a4');
+    let element;
+    if (a4) {
+      element = a4;
+    } else {
+      element = document.createElement('div');
+      element.innerHTML = invoiceHtml;
+    }
     html2pdf().from(element).set({
       margin: 0,
       filename: 'invoice.pdf',
-      html2canvas: { scale: 2 },
+      html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     }).save();
   };

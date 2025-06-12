@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import API_URL from '../config/api';
+import html2pdf from 'html2pdf.js';
 
 const AdminBilling = () => {
   const [tickets, setTickets] = useState([]);
@@ -80,6 +81,23 @@ const AdminBilling = () => {
     } catch (err) {
       alert('Erreur lors de l\'enregistrement de la facture.');
     }
+  };
+
+  const handleDownloadInvoice = () => {
+    let a4 = document.querySelector('#invoice-a4');
+    let element;
+    if (a4) {
+      element = a4;
+    } else {
+      element = document.createElement('div');
+      element.innerHTML = invoiceHtml;
+    }
+    html2pdf().from(element).set({
+      margin: 0,
+      filename: 'invoice.pdf',
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).save();
   };
 
   return (
@@ -157,6 +175,15 @@ const AdminBilling = () => {
               onClick={handleSaveInvoice}
             >
               Enregistrer
+            </Button>
+            <Button
+              variant="outlined"
+              color="primary"
+              sx={{ mb: 2 }}
+              onClick={handleDownloadInvoice}
+              disabled={loadingInvoice}
+            >
+              Télécharger
             </Button>
           </div>
         )}
