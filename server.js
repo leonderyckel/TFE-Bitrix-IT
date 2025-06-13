@@ -19,6 +19,7 @@ const rateLimit = require('express-rate-limit');
 
 // Initialize Express app
 const app = express();
+app.set('trust proxy', true); // Pour que req.ip reflète la vraie IP du client derrière Nginx
 // Create HTTP server
 const server = http.createServer(app);
 
