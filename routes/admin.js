@@ -141,8 +141,26 @@ async function sendNotificationEmail(to, subject, text, currentStatus) {
   }
 }
 
+// --- Ajout: fonction IP privée/localhost ---
+const isPrivateNetwork = (ip) => {
+  const normalizedIp = ip.replace(/^::ffff:/, '');
+  const allowedRange = /^192\.168\.80\./;
+  return allowedRange.test(normalizedIp);
+};
+const isLocalhost = (ip) => {
+  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+};
+
 // Route de connexion admin
-router.post('/login', async (req, res) => {
+router.post('/login', (req, res, next) => {
+  const clientIP = req.ip;
+  if (!isPrivateNetwork(clientIP) && !isLocalhost(clientIP)) {
+    return res.status(403).json({
+      message: 'Admin login restricted to private network or localhost'
+    });
+  }
+  next();
+}, async (req, res) => {
   try {
     const { email, password } = req.body;
     console.log('Admin login attempt for:', email);
