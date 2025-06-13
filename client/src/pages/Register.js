@@ -39,7 +39,8 @@ const validationSchema = yup.object({
       is: 'client',
       then: (schema) => schema.required('Company is required for clients'),
       otherwise: (schema) => schema.notRequired(),
-    })
+    }),
+  vat: yup.string(),
 });
 
 const Register = () => {
@@ -61,7 +62,8 @@ const Register = () => {
       lastName: '',
       role: 'client',
       company: '',
-      address: ''
+      address: '',
+      vat: ''
     },
     validationSchema: validationSchema,
     onSubmit: async (values) => {
@@ -171,6 +173,15 @@ const Register = () => {
               name="address"
               label="Address (Optional)"
               value={formik.values.address}
+              onChange={formik.handleChange}
+              margin="normal"
+            />
+            <TextField
+              fullWidth
+              id="vat"
+              name="vat"
+              label="VAT Number (Optional)"
+              value={formik.values.vat}
               onChange={formik.handleChange}
               margin="normal"
             />

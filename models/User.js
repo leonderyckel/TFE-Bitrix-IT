@@ -45,6 +45,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  vat: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   isCompanyBoss: {
     type: Boolean,
     default: false

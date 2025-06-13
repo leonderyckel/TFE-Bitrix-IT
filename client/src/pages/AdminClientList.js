@@ -29,6 +29,7 @@ const clientValidationSchema = yup.object({
   lastName: yup.string().required('Last name is required'),
   email: yup.string().email('Enter a valid email').required('Email is required'),
   company: yup.string(),
+  vat: yup.string(),
   password: yup.string().when('isEditing', {
       is: false,
       then: schema => schema.required('Password is required for new clients'),
@@ -114,6 +115,7 @@ function AdminClientList() {
       lastName: '',
       email: '',
       company: '',
+      vat: '',
       address: '',
       isCompanyBoss: false,
       password: '',
@@ -165,6 +167,7 @@ function AdminClientList() {
           lastName: client.lastName || '',
           email: client.email || '',
           company: client.company || '',
+          vat: client.vat || '',
           address: client.address || '',
           isCompanyBoss: client.isCompanyBoss || false,
           password: '',
@@ -175,7 +178,7 @@ function AdminClientList() {
       setIsEditing(false);
       formik.resetForm({
           values: {
-              firstName: '', lastName: '', email: '', company: '', address: '',
+              firstName: '', lastName: '', email: '', company: '', vat: '', address: '',
               isCompanyBoss: false, password: '', isEditing: false
           }
       });
@@ -329,7 +332,7 @@ function AdminClientList() {
       ) : (
         <TableContainer component={Paper} elevation={3}>
           <Table sx={{ minWidth: 650 }} aria-label="client list table">
-            <TableHead sx={{ backgroundColor: 'grey.100' }}><TableRow><TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Company</TableCell><TableCell sx={{ fontWeight: 'bold', textAlign: 'right' }}>Actions</TableCell></TableRow></TableHead>
+            <TableHead sx={{ backgroundColor: 'grey.100' }}><TableRow><TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Company</TableCell><TableCell sx={{ fontWeight: 'bold' }}>VAT</TableCell><TableCell sx={{ fontWeight: 'bold', textAlign: 'right' }}>Actions</TableCell></TableRow></TableHead>
             <TableBody>
               {filteredClients.length > 0 ? (
                 filteredClients.map((client) => (
@@ -343,6 +346,7 @@ function AdminClientList() {
                     </TableCell>
                     <TableCell>{client.email}</TableCell>
                     <TableCell>{client.company || '-'}</TableCell>
+                    <TableCell>{client.vat || '-'}</TableCell>
                      <TableCell align="right">
                          <Tooltip title="Edit Client">
                              <IconButton color="primary" size="small" onClick={() => handleClickOpenFormDialog(client)}>
@@ -359,7 +363,7 @@ function AdminClientList() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} align="center">
+                  <TableCell colSpan={5} align="center">
                     No clients found{ (nameSearch || companyFilter) ? ' matching your filters.' : '.'}
                   </TableCell>
                 </TableRow>
@@ -416,6 +420,17 @@ function AdminClientList() {
              />
              <TextField
                 margin="dense"
+                id="vat"
+                name="vat"
+                label="VAT Number (Optional)"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={formik.values.vat}
+                onChange={formik.handleChange}
+             />
+             <TextField
+                margin="dense"
                 id="company"
                 name="company"
                 label="Company (Optional)"
@@ -427,23 +442,6 @@ function AdminClientList() {
                 error={formik.touched.company && Boolean(formik.errors.company)}
                 helperText={formik.touched.company && formik.errors.company}
              />
-             {isEditing && selectedClient?.companyKey && (
-               <Box sx={{ mt: 1, mb: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
-                 <FormControlLabel
-                   control={
-                     <Checkbox
-                       checked={setCompanyChecked}
-                       onChange={handleSetCompanyNameCheckbox}
-                       color="primary"
-                       disabled={setCompanySubmitting || !formik.values.company}
-                     />
-                   }
-                   label="Set as official company name"
-                 />
-                 {setCompanySubmitting && <CircularProgress size={18} />}
-                 {setCompanyError && <Typography color="error" variant="body2">{setCompanyError}</Typography>}
-               </Box>
-             )}
              <TextField
                 margin="dense"
                 id="address"
