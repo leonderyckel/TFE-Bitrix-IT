@@ -1302,7 +1302,7 @@ router.get('/clients', async (req, res) => {
     // Récupérer uniquement les utilisateurs avec le rôle 'client'
     // Sélectionnez les champs nécessaires pour l'affichage (id, nom, email)
     const clients = await User.find({ role: 'client' })
-                          .select('_id firstName lastName email company companyKey address isCompanyBoss') // Ajout de companyKey
+                          .select('_id firstName lastName email company companyKey address isCompanyBoss vat') // Ajout de vat
                           .lean();
     
     res.json(clients);
@@ -1536,7 +1536,7 @@ router.put('/clients/:clientId', async (req, res) => {
     const { User } = getModels();
     const { clientId } = req.params;
     // Destructure isCompanyBoss from body, remove role
-    const { firstName, lastName, email, company, address, isCompanyBoss } = req.body;
+    const { firstName, lastName, email, company, address, isCompanyBoss, vat } = req.body;
 
     // --- Security Check: Only Admins or Technicians can change the boss flag ---
     const allowedRoles = ['admin', 'technician'];
@@ -1556,7 +1556,8 @@ router.put('/clients/:clientId', async (req, res) => {
       lastName,
       email,
       company,
-      address
+      address,
+      vat
     };
 
     // Add isCompanyBoss to updateData ONLY if it was provided AND the user is an allowed role
@@ -1591,6 +1592,7 @@ router.put('/clients/:clientId', async (req, res) => {
         lastName: updatedUser.lastName,
         company: updatedUser.company,
         address: updatedUser.address,
+        vat: updatedUser.vat,
         role: updatedUser.role, // Role is always 'client' now
         isCompanyBoss: updatedUser.isCompanyBoss // Include the boss status
     });
@@ -2394,7 +2396,7 @@ router.post('/clients', async (req, res) => {
   }
   try {
     const { User, AdminUser } = getModels();
-    const { email, password, firstName, lastName, company, address } = req.body;
+    const { email, password, firstName, lastName, company, address, vat } = req.body;
     if (!email || !password || !firstName || !lastName) {
       return res.status(400).json({ message: 'Missing required fields: email, password, firstName, lastName.' });
     }
@@ -2412,6 +2414,7 @@ router.post('/clients', async (req, res) => {
       company,
       companyKey,
       address,
+      vat, // <-- AJOUT ICI
       role: 'client'
     });
     res.status(201).json({
@@ -2421,6 +2424,7 @@ router.post('/clients', async (req, res) => {
       lastName: newUser.lastName,
       company: newUser.company,
       address: newUser.address,
+      vat: newUser.vat, // <-- AJOUT ICI POUR LE RETOUR
       role: newUser.role
     });
   } catch (error) {
