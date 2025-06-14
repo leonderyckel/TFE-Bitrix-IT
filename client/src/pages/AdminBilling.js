@@ -79,9 +79,27 @@ const AdminBilling = () => {
       await axios.post(`${API_URL}/admin/invoice`, invoiceData, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      alert('Facture enregistrée avec succès !');
+      setShowInvoice(false);
     } catch (err) {
       alert('Erreur lors de l\'enregistrement de la facture.');
+    }
+  };
+
+  const handleUpdatePreview = async () => {
+    if (!invoiceData) return;
+    setLoadingInvoice(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post(`${API_URL}/admin/invoice/preview`, invoiceData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data && res.data.html) {
+        setInvoiceHtml(res.data.html);
+      }
+    } catch (err) {
+      setInvoiceHtml('<div style="padding:40px;color:red;">Erreur lors de la génération de la preview.</div>');
+    } finally {
+      setLoadingInvoice(false);
     }
   };
 
@@ -161,15 +179,23 @@ const AdminBilling = () => {
                   <TableCell>{ticket.client ? `${ticket.client.firstName} ${ticket.client.lastName}` : 'N/A'}</TableCell>
                   <TableCell>{ticket.client?.company || 'N/A'}</TableCell>
                   <TableCell>{ticket.updatedAt ? new Date(ticket.updatedAt).toLocaleDateString() : 'N/A'}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      size="small"
-                      onClick={() => handleShowInvoice(ticket._id)}
-                    >
-                      Invoice
-                    </Button>
+                  <TableCell sx={{ verticalAlign: 'middle', p: 0 }}>
+                    {ticket.invoice?.saved ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', color: 'success.main', fontWeight: 'bold', fontSize: 16, gap: 1.5, minHeight: 56, height: '100%', width: '100%' }}>
+                        <span style={{ fontSize: 24, lineHeight: 1 }}>✔</span>
+                        <span style={{ fontWeight: 600, fontSize: 16 }}>Saved</span>
+                      </Box>
+                    ) : (
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        size="small"
+                        onClick={() => handleShowInvoice(ticket._id)}
+                        sx={{ ml: 0 }}
+                      >
+                        Invoice
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -260,9 +286,6 @@ const AdminBilling = () => {
             }}>
               <form style={{ width: '100%' }} onSubmit={e => { e.preventDefault(); handleSaveInvoice(); }}>
                 <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold', pt: 2 }}>Edit Invoice</Typography>
-                <TextField fullWidth label="Client Name" value={invoiceData.clientName || ''} onChange={e => setInvoiceData({ ...invoiceData, clientName: e.target.value })} sx={{ mb: 2 }} />
-                <TextField fullWidth label="Client Address" value={invoiceData.clientAddress || ''} onChange={e => setInvoiceData({ ...invoiceData, clientAddress: e.target.value })} sx={{ mb: 2 }} />
-                <TextField fullWidth label="Customer VAT No" value={invoiceData.clientVAT || ''} onChange={e => setInvoiceData({ ...invoiceData, clientVAT: e.target.value })} sx={{ mb: 2 }} />
                 <TextField fullWidth label="Invoice Number" value={invoiceData.invoiceNumber || ''} onChange={e => setInvoiceData({ ...invoiceData, invoiceNumber: e.target.value })} sx={{ mb: 2 }} />
                 <TextField fullWidth label="Date" value={invoiceData.date || ''} onChange={e => setInvoiceData({ ...invoiceData, date: e.target.value })} sx={{ mb: 2 }} />
                 <TextField fullWidth label="Due Date" value={invoiceData.dueDate || ''} onChange={e => setInvoiceData({ ...invoiceData, dueDate: e.target.value })} sx={{ mb: 2 }} />
@@ -286,7 +309,13 @@ const AdminBilling = () => {
                 <TextField fullWidth label="Total Due" value={invoiceData.totalDue || ''} onChange={e => setInvoiceData({ ...invoiceData, totalDue: e.target.value })} sx={{ mb: 2 }} />
                 <TextField fullWidth label="Notes" value={Array.isArray(invoiceData.notes) ? invoiceData.notes.join('\n') : invoiceData.notes || ''} multiline minRows={2} onChange={e => setInvoiceData({ ...invoiceData, notes: e.target.value.split('\n') })} sx={{ mb: 2 }} />
                 <TextField fullWidth label="Bank Details" value={invoiceData.bankDetails || ''} onChange={e => setInvoiceData({ ...invoiceData, bankDetails: e.target.value })} sx={{ mb: 2 }} />
-                <Button variant="contained" color="success" sx={{ mt: 3, mb: 2, width: 160, fontWeight: 'bold', fontSize: 18 }} type="submit">Save</Button>
+                {/* Boutons d'action alignés à droite */}
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 3, mb: 2, background: '#f8fafc', borderRadius: 2, p: 2, boxShadow: '0 1px 4px rgba(0,0,0,0.04)', justifyContent: 'flex-end' }}>
+                  <Button variant="contained" color="primary" onClick={handleUpdatePreview} disabled={loadingInvoice}>
+                    {loadingInvoice ? 'Mise à jour...' : 'Update Preview'}
+                  </Button>
+                  <Button variant="contained" color="success" type="submit">Save</Button>
+                </Box>
               </form>
             </Box>
             {/* Aperçu à droite */}

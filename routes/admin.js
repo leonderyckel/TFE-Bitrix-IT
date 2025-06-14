@@ -2554,6 +2554,23 @@ router.get('/invoice/preview/:ticketId', async (req, res) => {
   }
 });
 
+// Aperçu HTML de la facture à partir de données envoyées (pour update preview)
+router.post('/invoice/preview', async (req, res) => {
+  try {
+    // Les données de la facture sont dans req.body
+    const data = req.body;
+    // Lis le template HTML
+    const templatePath = path.join(__dirname, '../templates/invoiceTemplate.html');
+    const templateSource = fs.readFileSync(templatePath, 'utf8');
+    const template = Handlebars.compile(templateSource);
+    const html = template(data);
+    res.json({ html, data });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Erreur serveur');
+  }
+});
+
 // Fonction pour obtenir le prochain numéro de facture incrémental
 async function getNextInvoiceNumber(getModels) {
   const { InvoiceCounter } = getModels();
@@ -2576,6 +2593,11 @@ router.post('/invoice', async (req, res) => {
     }
     const invoice = new Invoice(invoiceData);
     await invoice.save();
+    // Marquer le ticket comme 'Enregistré'
+    if (invoiceData.ticket) {
+      const { Ticket } = getModels();
+      await Ticket.findByIdAndUpdate(invoiceData.ticket, { 'invoice.saved': true });
+    }
     res.status(201).json(invoice);
   } catch (err) {
     console.error('Erreur lors de la création de la facture:', err);

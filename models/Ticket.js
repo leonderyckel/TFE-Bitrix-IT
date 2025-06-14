@@ -99,7 +99,11 @@ const ticketSchema = new mongoose.Schema({
     },
     amount: Number,
     sageInvoiceId: String,
-    generatedAt: Date
+    generatedAt: Date,
+    saved: {
+      type: Boolean,
+      default: false
+    }
   },
   createdAt: {
     type: Date,
