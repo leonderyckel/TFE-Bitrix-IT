@@ -27,6 +27,7 @@ const AdminBilling = () => {
   const [invoiceHtml, setInvoiceHtml] = useState('');
   const [loadingInvoice, setLoadingInvoice] = useState(false);
   const [invoiceData, setInvoiceData] = useState(null);
+  const [currentTicketId, setCurrentTicketId] = useState(null);
 
   useEffect(() => {
     const fetchClosedTickets = async () => {
@@ -49,6 +50,7 @@ const AdminBilling = () => {
   const handleShowInvoice = async (ticketId) => {
     setLoadingInvoice(true);
     setShowInvoice(true);
+    setCurrentTicketId(ticketId);
     try {
       const token = localStorage.getItem('token');
       const res = await axios.get(`${API_URL}/admin/invoice/preview/${ticketId}`, {
@@ -80,6 +82,10 @@ const AdminBilling = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       setShowInvoice(false);
+      if (invoiceData.ticket || invoiceData._id || currentTicketId) {
+        const ticketId = invoiceData.ticket || invoiceData._id || currentTicketId;
+        setTickets(prev => prev.map(t => t._id === ticketId ? { ...t, invoice: { ...t.invoice, saved: true } } : t));
+      }
     } catch (err) {
       alert('Erreur lors de l\'enregistrement de la facture.');
     }
