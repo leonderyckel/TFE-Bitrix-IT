@@ -3,6 +3,10 @@ const router = express.Router();
 const { auth, requireRole } = require('../middleware/auth');
 const userController = require('../controllers/userController');
 const ticketController = require('../controllers/ticketController');
+const path = require('path');
+const fs = require('fs');
+const Handlebars = require('handlebars');
+const { getModels } = require('../models/index');
 
 /**
  * @swagger
@@ -309,5 +313,55 @@ router.post('/tickets/:id/assign', auth, requireRole(['admin', 'technician']), t
 
 // GET /api/clients - Récupérer tous les clients
 // (Ajoute ici la route si elle existe, sinon à ajouter dans le code)
+
+// Route pour afficher le HTML d'une facture pour le client connecté
+router.get('/invoice/html/:id', auth, async (req, res) => {
+  try {
+    const { Invoice, Ticket, User } = getModels();
+    const invoice = await Invoice.findById(req.params.id);
+    if (!invoice) return res.status(404).json({ message: 'Facture non trouvée.' });
+
+    // Vérifie que la facture appartient bien au client connecté
+    if (invoice.client.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Accès interdit.' });
+    }
+
+    const ticket = await Ticket.findById(invoice.ticket);
+    const user = await User.findById(invoice.client);
+
+    // Lis le template HTML
+    const templatePath = path.join(__dirname, '../templates/invoiceTemplate.html');
+    const templateSource = fs.readFileSync(templatePath, 'utf8');
+    const template = Handlebars.compile(templateSource);
+
+    // Prépare les données comme dans la route admin
+    const data = {
+      ...invoice.toObject(),
+      clientName: user.firstName + ' ' + user.lastName,
+      clientAddress: user.address,
+      clientVAT: user.vat,
+      reference: invoice.reference || (ticket ? ticket.title : ''),
+    };
+
+    const html = template(data);
+    res.send(html);
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors de la génération du HTML de la facture.' });
+  }
+});
+
+// Route pour récupérer les factures sauvegardées du client connecté
+router.get('/billing/invoices', auth, async (req, res) => {
+  try {
+    const { Ticket, Invoice } = getModels();
+    // On récupère les factures dont le ticket appartient au client connecté et qui sont marquées comme saved
+    const tickets = await Ticket.find({ client: req.user.id, 'invoice.saved': true }).select('_id');
+    const ticketIds = tickets.map(t => t._id);
+    const invoices = await Invoice.find({ ticket: { $in: ticketIds } }).sort({ date: -1 });
+    res.json(invoices);
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors du chargement des factures.' });
+  }
+});
 
 module.exports = router; 

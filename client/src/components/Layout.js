@@ -142,7 +142,7 @@ const Layout = () => {
     { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' }
   ] : [
     { text: 'Tickets', icon: <SupportIcon />, path: '/tickets' },
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' }
+    { text: 'Billing', icon: <ReceiptIcon />, path: '/billing' }
   ];
 
   const drawer = (

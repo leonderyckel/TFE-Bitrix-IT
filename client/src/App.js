@@ -32,6 +32,7 @@ import AdminCompanyRemoteAccess from './pages/AdminCompanyRemoteAccess';
 import AdminCompanyLayout from './pages/AdminCompanyLayout';
 import AdminBilling from './pages/AdminBilling';
 import AdminBillingHistory from './pages/AdminBillingHistory';
+import ClientBilling from './pages/ClientBilling';
 
 // Create theme
 const theme = createTheme({
@@ -275,6 +276,14 @@ function AppContent() {
           element={
             <PrivateRoute roles={['admin', 'technician']}>
               <AdminBillingHistory />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="billing" 
+          element={
+            <PrivateRoute roles={['client']}>
+              <ClientBilling />
             </PrivateRoute>
           } 
         />
