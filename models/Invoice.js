@@ -32,6 +32,7 @@ const invoiceSchema = new mongoose.Schema({
   notes: [String],
   bankDetails: String,
   pdfUrl: String,
+  paid: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
