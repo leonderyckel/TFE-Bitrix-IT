@@ -123,6 +123,7 @@ const AdminBillingHistory = () => {
                 <TableCell>Number</TableCell>
                 <TableCell>Client</TableCell>
                 <TableCell>Date</TableCell>
+                <TableCell>Payment</TableCell>
                 <TableCell>Action</TableCell>
               </TableRow>
             </TableHead>
@@ -132,6 +133,13 @@ const AdminBillingHistory = () => {
                   <TableCell>{invoice.invoiceNumber}</TableCell>
                   <TableCell>{invoice.clientName || 'N/A'}</TableCell>
                   <TableCell>{invoice.date}</TableCell>
+                  <TableCell>
+                    {invoice.paid ? (
+                      <span style={{ color: 'green', fontWeight: 600 }}>Paid</span>
+                    ) : (
+                      <span style={{ color: 'red', fontWeight: 600 }}>Not paid</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Button
                       variant="contained"

@@ -4,6 +4,9 @@ import axios from 'axios';
 import API_URL from '../config/api';
 import html2pdf from 'html2pdf.js';
 import Dialog from '@mui/material/Dialog';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
+import CloseIcon from '@mui/icons-material/Close';
 
 const ClientBilling = () => {
   const [invoices, setInvoices] = useState([]);
@@ -14,6 +17,11 @@ const ClientBilling = () => {
   const [showInvoice, setShowInvoice] = useState(false);
   const [invoiceHtml, setInvoiceHtml] = useState('');
   const [loadingInvoice, setLoadingInvoice] = useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState(null);
+  const [paidInput, setPaidInput] = useState('');
+  const [paidError, setPaidError] = useState('');
+  const [paidDialogOpen, setPaidDialogOpen] = useState(false);
+  const [paidDialogInvoice, setPaidDialogInvoice] = useState(null);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -93,6 +101,26 @@ const ClientBilling = () => {
     }
   };
 
+  const handlePaidClick = (invoiceId) => {
+    const invoice = invoices.find(inv => inv._id === invoiceId);
+    setPaidDialogInvoice(invoice);
+    setPaidDialogOpen(true);
+  };
+
+  const handleMarkAsPaid = async () => {
+    if (!paidDialogInvoice) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(`${API_URL}/invoice/mark-paid/${paidDialogInvoice._id}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPaidDialogOpen(false);
+      setInvoices(invoices.map(inv => inv._id === paidDialogInvoice._id ? { ...inv, paid: true } : inv));
+    } catch (err) {
+      alert('Error updating invoice status.');
+    }
+  };
+
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>
@@ -126,7 +154,7 @@ const ClientBilling = () => {
                       variant="contained"
                       color="primary"
                       size="small"
-                      onClick={() => handleShowInvoice(invoice._id)}
+                      onClick={() => { handleShowInvoice(invoice._id); setSelectedInvoiceId(invoice._id); }}
                       sx={{ mr: 1 }}
                     >
                       Voir
@@ -136,8 +164,18 @@ const ClientBilling = () => {
                       color="secondary"
                       size="small"
                       onClick={() => handleDownloadInvoice(invoice._id)}
+                      sx={{ mr: 1 }}
                     >
-                      Télécharger
+                      Download
+                    </Button>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      size="small"
+                      disabled={invoice.paid}
+                      onClick={() => handlePaidClick(invoice._id)}
+                    >
+                      PAY
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -161,11 +199,76 @@ const ClientBilling = () => {
         {loadingInvoice ? (
           <div style={{ padding: 40, textAlign: 'center' }}><CircularProgress /></div>
         ) : (
-          <div
-            style={{ minHeight: 600, background: '#e5e5e5' }}
-            dangerouslySetInnerHTML={{ __html: invoiceHtml }}
-          />
+          <div style={{ minHeight: 600, background: '#e5e5e5' }}>
+            <div dangerouslySetInnerHTML={{ __html: invoiceHtml }} />
+            <Box sx={{ mt: 3, p: 2, background: '#fff', borderRadius: 2, boxShadow: 1 }}>
+              <Typography variant="h6" sx={{ mb: 1 }}>Informations de paiement</Typography>
+              <Typography variant="body2">Bénéficiaire: Bitrix IT</Typography>
+              <Typography variant="body2">BANK: StandardBank Tyger Manor</Typography>
+              <Typography variant="body2">BRANCH CODE: 050410</Typography>
+              <Typography variant="body2">ACCOUNT NUMBER: 401823768</Typography>
+              {!invoices.find(inv => inv._id === selectedInvoiceId)?.paid && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography sx={{ mb: 1 }}>Pour marquer la facture comme payée, écrivez <b>paid</b> ci-dessous :</Typography>
+                  <TextField
+                    value={paidInput}
+                    onChange={e => { setPaidInput(e.target.value); setPaidError(''); }}
+                    error={!!paidError}
+                    helperText={paidError}
+                    size="small"
+                    label="Confirmation"
+                  />
+                  <Button
+                    variant="contained"
+                    color="success"
+                    sx={{ mt: 2, ml: 2 }}
+                    onClick={handleMarkAsPaid}
+                  >
+                    Confirmer
+                  </Button>
+                </Box>
+              )}
+              {invoices.find(inv => inv._id === selectedInvoiceId)?.paid && (
+                <Typography color="success.main" sx={{ mt: 1 }}>Facture marquée comme payée</Typography>
+              )}
+            </Box>
+          </div>
         )}
+      </Dialog>
+      <Dialog open={paidDialogOpen} onClose={() => setPaidDialogOpen(false)} maxWidth="xs" fullWidth>
+        <Box sx={{ p: 4, background: '#fff', borderRadius: 2, position: 'relative' }}>
+          <IconButton
+            aria-label="close"
+            onClick={() => setPaidDialogOpen(false)}
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
+          <Typography variant="h6" sx={{ mb: 2 }}>Payment Information</Typography>
+          <Typography variant="body2">Beneficiary: Bitrix IT</Typography>
+          <Typography variant="body2">BANK: StandardBank Tyger Manor</Typography>
+          <Typography variant="body2">BRANCH CODE: 050410</Typography>
+          <Typography variant="body2">ACCOUNT NUMBER: 401823768</Typography>
+          {paidDialogInvoice && (
+            <Typography variant="body2" sx={{ mt: 2, fontWeight: 'bold' }}>
+              Amount to pay: {paidDialogInvoice.totalDue || paidDialogInvoice.amount || '-'}
+            </Typography>
+          )}
+          {!paidDialogInvoice?.paid && (
+            <Button
+              variant="contained"
+              color="success"
+              sx={{ mt: 4, ml: 0 }}
+              onClick={handleMarkAsPaid}
+              fullWidth
+            >
+              Confirm
+            </Button>
+          )}
+          {paidDialogInvoice?.paid && (
+            <Typography color="success.main" sx={{ mt: 2 }}>Invoice marked as paid</Typography>
+          )}
+        </Box>
       </Dialog>
     </Box>
   );
