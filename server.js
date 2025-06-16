@@ -80,6 +80,13 @@ io.use(async (socket, next) => {
 // Basic connection listener
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
+  
+  // Auto-join user to their personal room
+  if (socket.user) {
+    const userRoom = `user_${socket.user._id}`;
+    socket.join(userRoom);
+    console.log(`Socket ${socket.id} auto-joined user room ${userRoom}`);
+  }
 
   // === Ticket-Specific Room Logic ===
   // Listen for clients/admins wanting to join a ticket-specific room

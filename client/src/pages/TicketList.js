@@ -24,7 +24,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import UpdateIcon from '@mui/icons-material/Update';
 import { useSnackbar } from 'notistack';
-import { fetchTickets, updateTicketInList } from '../store/slices/ticketSlice';
+import { fetchTickets, updateTicketInList, addNewTicketToList } from '../store/slices/ticketSlice';
 import { addNotification } from '../store/slices/notificationSlice';
 import io from 'socket.io-client';
 import API_URL from '../config/api';
@@ -84,13 +84,51 @@ const TicketList = () => {
         ticketId: updatedTicket._id
       }));
     };
+
+    const handleNewTicketCreated = (payload) => {
+      const newTicket = payload;
+      console.log('[TicketList] Received newTicketCreated', newTicket);
+      
+      // Check if this ticket is for the current user
+      if (newTicket.client && newTicket.client._id === user?.id) {
+        const notificationText = `Nouveau ticket créé: ${newTicket.title}`;
+        
+        // Add the new ticket to the list directly without refreshing
+        dispatch(addNewTicketToList(newTicket));
+        
+        // Show notification
+        enqueueSnackbar(notificationText, {
+          variant: 'success',
+          action: (key) => (
+            <Button 
+              size="small" 
+              onClick={() => {
+                navigate(`/tickets/${newTicket._id}`);
+              }}
+              sx={{ color: 'white' }}
+            >
+              Voir
+            </Button>
+          ),
+        });
+        
+        // Add to notification store
+        dispatch(addNotification({
+          text: notificationText,
+          ticketId: newTicket._id
+        }));
+      }
+    };
+
     socket.on('ticket:updated', handleTicketUpdated);
+    socket.on('newTicketCreated', handleNewTicketCreated);
 
     return () => {
       socket.off('ticket:updated', handleTicketUpdated);
+      socket.off('newTicketCreated', handleNewTicketCreated);
       console.log('[TicketList] Socket and listeners cleaned up.');
     };
-  }, [dispatch, enqueueSnackbar, navigate, socket, isReady]);
+  }, [dispatch, enqueueSnackbar, navigate, socket, isReady, user?.id]);
 
   useEffect(() => {
     if (!socket || !isReady) return;

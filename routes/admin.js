@@ -1429,7 +1429,25 @@ router.post('/tickets', async (req, res) => {
     });
 
     await newTicket.save();
-    res.status(201).json(newTicket);
+
+    // Populate the ticket with client information for the notification
+    const populatedTicket = await Ticket.findById(newTicket._id).populate('client', 'firstName lastName company');
+
+    // Emit WebSocket notification to the specific client
+    if (req.io) {
+      const notificationData = {
+        ...populatedTicket.toObject(),
+        notificationText: `Nouveau ticket créé: ${populatedTicket.title}`,
+        isNewTicket: true
+      };
+      
+      // Emit to the specific client's personal room
+      const clientRoom = `user_${clientId}`;
+      req.io.to(clientRoom).emit('newTicketCreated', notificationData);
+      console.log(`[WebSocket] New ticket notification sent to room ${clientRoom} for ticket ${populatedTicket._id}`);
+    }
+
+    res.status(201).json(populatedTicket);
 
   } catch (error) {
     console.error('Error creating ticket for client by admin:', error);

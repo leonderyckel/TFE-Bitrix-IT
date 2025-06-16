@@ -165,6 +165,11 @@ const ticketSlice = createSlice({
       if (state.currentTicket && state.currentTicket._id === updatedTicket._id) {
         state.currentTicket = updatedTicket;
       }
+    },
+    addNewTicketToList: (state, action) => {
+      const newTicket = action.payload;
+      // Add to myTickets since it's a ticket for the current user
+      state.myTickets.unshift(newTicket);
     }
   },
   extraReducers: (builder) => {
@@ -287,7 +292,8 @@ export const {
   createTicketSuccess,
   updateTicketSuccess,
   deleteTicketSuccess,
-  updateTicketInList
+  updateTicketInList,
+  addNewTicketToList
 } = ticketSlice.actions;
 
 export default ticketSlice.reducer; 
