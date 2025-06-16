@@ -99,6 +99,10 @@ app.use(express.urlencoded({ extended: true }));
 // --- Make io accessible in routes ---
 app.use((req, res, next) => {
   req.io = io;
+  res.setHeader(
+    'Content-Security-Policy',
+    "img-src 'self' data: https://i.imgur.com;"
+  );
   next();
 });
 // --- End middleware ---
@@ -130,7 +134,7 @@ const startServer = async () => {
     }
     
     const PORT = process.env.PORT || 5001;
-    // Use the HTTP server to listen, not the Express app directly
+    // Use the HTTP server to listen, not the Express app 
     server.listen(PORT, () => { 
       console.log(`Server is running on port ${PORT}`);
       console.log('Socket.IO server initialized and listening.');
