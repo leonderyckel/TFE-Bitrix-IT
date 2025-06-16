@@ -48,11 +48,6 @@ const TicketList = () => {
   useEffect(() => {
     dispatch(fetchTickets());
 
-    if (!socketRef.current) {
-      socketRef.current = io(WS_URL);
-    }
-    const socket = socketRef.current;
-
     socket.on('connect', () => {
       console.log('[TicketList] Socket connected:', socket.id);
     });
@@ -93,10 +88,9 @@ const TicketList = () => {
       socket.off('ticket:updated', handleTicketUpdated);
       console.log('[TicketList] Socket and listeners cleaned up.');
     };
-  }, [dispatch, enqueueSnackbar, navigate]);
+  }, [dispatch, enqueueSnackbar, navigate, socket]);
 
   useEffect(() => {
-    const socket = socketRef.current;
     if (!socket || !socket.connected) return;
 
     // Combine all visible ticket IDs

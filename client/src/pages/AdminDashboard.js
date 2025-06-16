@@ -99,7 +99,7 @@ function AdminDashboard() {
       );
     });
 
-  }, [fetchTickets, token]); // Include fetchTickets and token
+  }, [fetchTickets, token, socket]); // Include fetchTickets and token
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);

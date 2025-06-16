@@ -4,7 +4,7 @@ dotenv.config(); // Load environment variables FIRST
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { initializeModels } = require('./models');
+const { initializeModels, getModels } = require('./models');
 // Import http and socket.io
 const http = require('http');
 const { Server } = require("socket.io");
@@ -16,6 +16,7 @@ const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
 
 // Initialize Express app
 const app = express();
@@ -41,6 +42,31 @@ const io = new Server(server, {
     origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true
+  }
+});
+
+// Middleware d'authentification pour socket.io
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) {
+    return next(new Error('Authentication error: No token'));
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { User, AdminUser } = getModels();
+    let user;
+    if (decoded.isAdmin) {
+      user = await AdminUser.findById(decoded.id).select('-password');
+    } else {
+      user = await User.findById(decoded.id).select('-password');
+    }
+    if (!user) {
+      return next(new Error('Authentication error: User not found'));
+    }
+    socket.user = user;
+    next();
+  } catch (err) {
+    return next(new Error('Authentication error: Invalid token'));
   }
 });
 
