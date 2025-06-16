@@ -7,7 +7,11 @@ const SocketContext = createContext(null);
 export const SocketProvider = ({ children }) => {
   const socketRef = useRef();
   if (!socketRef.current) {
-    socketRef.current = io(WS_URL, { autoConnect: true });
+    const token = localStorage.getItem('token');
+    socketRef.current = io(WS_URL, {
+      autoConnect: true,
+      auth: { token }
+    });
   }
   return (
     <SocketContext.Provider value={socketRef.current}>
