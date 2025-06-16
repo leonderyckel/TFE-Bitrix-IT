@@ -47,8 +47,15 @@ const TicketList = () => {
 
   useEffect(() => {
     dispatch(fetchTickets());
+  }, [dispatch]);
 
-    if (!socket || !isReady) return;
+  useEffect(() => {
+    if (!socket || !isReady) {
+      console.log('[TicketList] Socket not ready yet, skipping event listeners setup');
+      return;
+    }
+
+    console.log('[TicketList] Setting up socket event listeners');
 
     socket.on('connect', () => {
       console.log('[TicketList] Socket connected:', socket.id);
@@ -123,10 +130,12 @@ const TicketList = () => {
     socket.on('ticket:updated', handleTicketUpdated);
     socket.on('newTicketCreated', handleNewTicketCreated);
 
+    console.log('[TicketList] Socket event listeners set up successfully');
+
     return () => {
       socket.off('ticket:updated', handleTicketUpdated);
       socket.off('newTicketCreated', handleNewTicketCreated);
-      console.log('[TicketList] Socket and listeners cleaned up.');
+      console.log('[TicketList] Socket event listeners cleaned up');
     };
   }, [dispatch, enqueueSnackbar, navigate, socket, isReady, user?.id]);
 

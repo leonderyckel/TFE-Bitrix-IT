@@ -1431,7 +1431,7 @@ router.post('/tickets', async (req, res) => {
     await newTicket.save();
 
     // Populate the ticket with client information for the notification
-    const populatedTicket = await Ticket.findById(newTicket._id).populate('client', 'firstName lastName company');
+    const populatedTicket = await Ticket.findById(newTicket._id).populate('client', 'firstName lastName company email');
 
     // Emit WebSocket notification to the specific client
     if (req.io) {
@@ -1445,6 +1445,31 @@ router.post('/tickets', async (req, res) => {
       const clientRoom = `user_${clientId}`;
       req.io.to(clientRoom).emit('newTicketCreated', notificationData);
       console.log(`[WebSocket] New ticket notification sent to room ${clientRoom} for ticket ${populatedTicket._id}`);
+    }
+
+    // Send email notification to the client
+    if (populatedTicket.client && populatedTicket.client.email) {
+      const notificationText = `Nouveau ticket créé: ${populatedTicket.title}`;
+
+      // Create notification in database
+      const { Notification } = getModels();
+      await Notification.create({
+        userRef: populatedTicket.client._id,
+        userModel: 'User',
+        text: notificationText,
+        link: `/tickets/${populatedTicket._id}`
+      });
+
+      // Use existing email template with simplified text
+      await sendNotificationEmail(
+        populatedTicket.client.email,
+        notificationText,
+        notificationText,
+        'logged'
+      );
+      console.log(`[Email] New ticket notification sent to ${populatedTicket.client.email} for ticket ${populatedTicket._id}`);
+    } else {
+      console.warn(`[Email] Cannot send email notification - client email not found for ticket ${populatedTicket._id}`);
     }
 
     res.status(201).json(populatedTicket);

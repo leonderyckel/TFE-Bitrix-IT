@@ -1,82 +1,118 @@
-import React, { createContext, useContext, useRef, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import io from 'socket.io-client';
 import WS_URL from '../config/ws';
 
-const SocketContext = createContext(null);
+const SocketContext = createContext();
+
+export const useSocket = () => {
+  const context = useContext(SocketContext);
+  if (!context) {
+    throw new Error('useSocket must be used within a SocketProvider');
+  }
+  return context;
+};
 
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [isReady, setIsReady] = useState(false);
-  const socketRef = useRef();
+  const { token, isAuthenticated, loading, user } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      console.log('No token available for socket connection');
-      return;
+    console.log('[SocketProvider] Auth state changed:', { 
+      hasToken: !!token, 
+      isAuthenticated, 
+      loading, 
+      hasUser: !!user 
+    });
+
+    // Clean up existing socket if any
+    if (socket) {
+      console.log('[SocketProvider] Cleaning up existing socket');
+      socket.disconnect();
+      setSocket(null);
+      setIsReady(false);
     }
 
-    if (!socketRef.current) {
-      console.log('Initializing socket connection with token');
+    // Only connect if we have a token and are authenticated
+    // Also wait for loading to complete to ensure user data is loaded
+    if (token && isAuthenticated && !loading && user) {
+      console.log('[SocketProvider] Initializing socket connection...');
+      
       const newSocket = io(WS_URL, {
-        autoConnect: false,
-        auth: { token },
+        auth: {
+          token: token
+        },
+        autoConnect: true,
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
         transports: ['websocket', 'polling']
       });
 
-      // Add connection event listeners
       newSocket.on('connect', () => {
-        console.log('Socket connected successfully');
+        console.log('[SocketProvider] Connected to server with ID:', newSocket.id);
+        
+        // Join user's personal room automatically
+        if (user && user.id) {
+          const userRoom = `user_${user.id}`;
+          console.log('[SocketProvider] Joining user room:', userRoom);
+          newSocket.emit('join-user-room', userRoom);
+        }
+        
         setIsReady(true);
       });
 
+      newSocket.on('disconnect', (reason) => {
+        console.log('[SocketProvider] Disconnected from server:', reason);
+        setIsReady(false);
+      });
+
       newSocket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error.message);
+        console.error('[SocketProvider] Connection error:', error);
         setIsReady(false);
       });
 
       newSocket.on('error', (error) => {
-        console.error('Socket error:', error);
+        console.error('[SocketProvider] Socket error:', error);
+      });
+
+      // Handle authentication errors
+      newSocket.on('auth_error', (error) => {
+        console.error('[SocketProvider] Authentication error:', error);
         setIsReady(false);
       });
 
-      newSocket.on('disconnect', () => {
-        console.log('Socket disconnected');
-        setIsReady(false);
-      });
-
-      socketRef.current = newSocket;
       setSocket(newSocket);
 
-      // Connect after setting up listeners
-      newSocket.connect();
+      return () => {
+        console.log('[SocketProvider] Cleaning up socket in useEffect cleanup');
+        newSocket.disconnect();
+      };
+    } else {
+      console.log('[SocketProvider] Not connecting socket - conditions not met:', {
+        hasToken: !!token,
+        isAuthenticated,
+        loading,
+        hasUser: !!user
+      });
+      setIsReady(false);
     }
+  }, [token, isAuthenticated, loading, user]);
 
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
-      if (socketRef.current) {
-        console.log('Cleaning up socket connection');
-        socketRef.current.disconnect();
-        socketRef.current = null;
-        setSocket(null);
-        setIsReady(false);
+      if (socket) {
+        console.log('[SocketProvider] Component unmounting, disconnecting socket');
+        socket.disconnect();
       }
     };
-  }, []); // Empty dependency array since we only want to set up once
+  }, []);
 
   return (
     <SocketContext.Provider value={{ socket, isReady }}>
       {children}
     </SocketContext.Provider>
   );
-};
-
-export const useSocket = () => {
-  const context = useContext(SocketContext);
-  if (context === undefined) {
-    throw new Error('useSocket must be used within a SocketProvider');
-  }
-  return context;
 }; 
