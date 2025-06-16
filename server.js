@@ -103,6 +103,10 @@ app.use((req, res, next) => {
     'Content-Security-Policy',
     "img-src 'self' data: https://i.imgur.com;"
   );
+  res.setHeader(
+    'Permissions-Policy',
+    'geolocation=(), microphone=(), camera=()'
+  );
   next();
 });
 // --- End middleware ---
