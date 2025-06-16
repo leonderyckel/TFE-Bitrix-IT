@@ -152,7 +152,17 @@ const isLocalhost = (ip) => {
 };
 
 // Route de connexion admin
-router.post('/login', async (req, res) => {
+router.post('/login', (req, res, next) => {
+  const clientIP = req.ip;
+  console.log('Admin login attempt from IP:', clientIP);
+  
+  if (!isPrivateNetwork(clientIP) && !isLocalhost(clientIP)) {
+    return res.status(403).json({
+      message: 'Admin login restricted to private network or localhost'
+    });
+  }
+  next();
+}, async (req, res) => {
   try {
     const { email, password } = req.body;
     console.log('Admin login attempt for:', email);
