@@ -214,7 +214,7 @@ router.post('/login', (req, res, next) => {
     });
   } catch (error) {
     console.error('Admin login error:', error);
-    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
@@ -286,7 +286,7 @@ router.get('/tickets', async (req, res) => {
     res.json(tickets);
   } catch (error) {
     console.error('Error fetching tickets for admin:', error);
-    res.status(500).json({ message: 'Erreur serveur', error: error.message }); // Added error details
+    res.status(500).json({ message: 'Server error', error: error.message }); // Added error details
   }
 });
 
@@ -512,7 +512,7 @@ router.post('/tickets/:id/progress', async (req, res) => {
 
   } catch (error) {
     console.error('Error adding progress update:', error);
-    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
@@ -562,7 +562,7 @@ router.get('/tickets/:id', async (req, res) => {
     res.json(ticket);
   } catch (error) {
     console.error('Error fetching ticket for admin:', error);
-    res.status(500).json({ message: 'Erreur serveur', error: error.message }); // Added error details
+    res.status(500).json({ message: 'Server error', error: error.message }); // Added error details
   }
 });
 
@@ -672,7 +672,7 @@ router.put('/tickets/:id', async (req, res) => {
     res.json(updatedTicket || ticket);
   } catch (error) {
     console.error('Error updating ticket for admin:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -836,7 +836,7 @@ router.post('/tickets/:id/comments', async (req, res) => {
 
   } catch (error) {
     console.error('[Admin Comment] Top-level error adding comment:', error);
-    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
@@ -990,7 +990,7 @@ router.post('/tickets/:id/assign', async (req, res) => {
 
   } catch (error) {
     console.error('[Assign] Top-level error assigning technician:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -1259,7 +1259,7 @@ router.post('/tickets/:id/close', async (req, res) => {
 
   } catch (error) {
     console.error('Error closing ticket for admin:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -1278,7 +1278,7 @@ router.get('/client-data/:clientId', async (req, res) => {
 
     res.json(companyData.getDecryptedData());
   } catch (error) {
-    res.status(500).json({ message: 'Erreur serveur' });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -1295,7 +1295,7 @@ router.post('/client-data/:clientId', async (req, res) => {
 
     res.json(companyData.getDecryptedData());
   } catch (error) {
-    res.status(500).json({ message: 'Erreur serveur' });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -1307,7 +1307,7 @@ router.get('/admins', async (req, res) => {
     const admins = await AdminUser.find({}, '-password');
     res.json(admins);
   } catch (error) {
-    res.status(500).json({ message: 'Erreur serveur' });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -1326,7 +1326,7 @@ router.get('/clients', async (req, res) => {
     res.json(clients);
   } catch (error) {
     console.error('Error fetching clients for admin:', error);
-    res.status(500).json({ message: 'Erreur serveur lors de la récupération des clients', error: error.message });
+    res.status(500).json({ message: 'Server error while fetching clients', error: error.message });
   }
 });
 
@@ -1386,7 +1386,7 @@ router.post('/admins', async (req, res) => {
       permissions: admin.permissions
     });
   } catch (error) {
-    res.status(500).json({ message: 'Erreur serveur' });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -1498,7 +1498,7 @@ router.get('/calendar-tickets', async (req, res) => {
     res.json(events);
   } catch (error) {
     console.error('Error fetching calendar tickets:', error);
-    res.status(500).json({ message: 'Erreur serveur lors de la récupération des événements du calendrier' });
+    res.status(500).json({ message: 'Server error while fetching calendar tickets', error: error.message });
   }
 });
 
@@ -2481,7 +2481,7 @@ router.get('/billing/closed-tickets', async (req, res) => {
     res.json(closedTickets);
   } catch (error) {
     console.error('Error fetching closed tickets for billing:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -2536,7 +2536,7 @@ router.get('/invoice/preview/:ticketId', async (req, res) => {
       subTotal: ticket.invoice?.amount || 0,
       totalDue: ticket.invoice?.amount || 0,
       notes: [
-        'Bénéficiaire: Bitrix IT',
+        'Beneficiary: Bitrix IT',
         'BANK: StandardBank Tyger Manor',
         'BRANCH CODE: 050410',
         'ACCOUNT NUMBER: 401823768'
@@ -2600,8 +2600,8 @@ router.post('/invoice', async (req, res) => {
     }
     res.status(201).json(invoice);
   } catch (err) {
-    console.error('Erreur lors de la création de la facture:', err);
-    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+    console.error('Error creating invoice:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
@@ -2614,7 +2614,7 @@ router.get('/invoices', async (req, res) => {
     const invoices = await Invoice.find().sort({ date: -1 });
     res.json(invoices);
   } catch (err) {
-    res.status(500).json({ message: 'Erreur lors du chargement des factures.' });
+    res.status(500).json({ message: 'Error loading invoices.' });
   }
 });
 
@@ -2624,11 +2624,11 @@ router.get('/invoice/:id', async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) {
-      return res.status(404).json({ message: 'Facture non trouvée.' });
+      return res.status(404).json({ message: 'Invoice not found.' });
     }
     res.json(invoice);
   } catch (err) {
-    res.status(500).json({ message: 'Erreur lors du chargement de la facture.' });
+    res.status(500).json({ message: 'Error fetching invoice.' });
   }
 });
 
@@ -2638,15 +2638,15 @@ router.get('/invoice/html/:id', async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) {
-      return res.status(404).json({ message: 'Facture non trouvée.' });
+      return res.status(404).json({ message: 'Invoice not found.' });
     }
     const ticket = await Ticket.findById(invoice.ticket);
     if (!ticket) {
-      return res.status(404).json({ message: 'Ticket non trouvé.' });
+      return res.status(404).json({ message: 'Ticket not found.' });
     }
     const user = await User.findById(ticket.userId || ticket.client);
     if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé.' });
+      return res.status(404).json({ message: 'User not found.' });
     }
     const templatePath = path.join(__dirname, '../templates/invoiceTemplate.html');
     const templateSource = await fsPromises.readFile(templatePath, 'utf8');
@@ -2697,7 +2697,7 @@ router.get('/invoice/html/:id', async (req, res) => {
       subTotal: invoice.subTotal || 0,
       totalDue: invoice.totalDue || 0,
       notes: invoice.notes || [
-        'Bénéficiaire: Bitrix IT',
+        'Beneficiary: Bitrix IT',
         'BANK: StandardBank Tyger Manor',
         'BRANCH CODE: 050410',
         'ACCOUNT NUMBER: 401823768'
@@ -2710,7 +2710,7 @@ router.get('/invoice/html/:id', async (req, res) => {
     const html = template(data);
     res.send(html);
   } catch (err) {
-    res.status(500).json({ message: 'Erreur lors de la génération du HTML de la facture.' });
+    res.status(500).json({ message: 'Error generating invoice HTML.' });
   }
 });
 

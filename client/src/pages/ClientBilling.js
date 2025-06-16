@@ -51,7 +51,7 @@ const ClientBilling = () => {
       });
       setInvoiceHtml(res.data.html || res.data);
     } catch (err) {
-      setInvoiceHtml('<div style="padding:40px;color:red;">Erreur lors du chargement de la facture.</div>');
+      setInvoiceHtml('<div style="padding:40px;color:red;">Error loading invoice.</div>');
     } finally {
       setLoadingInvoice(false);
     }
@@ -157,7 +157,7 @@ const ClientBilling = () => {
                       onClick={() => { handleShowInvoice(invoice._id); setSelectedInvoiceId(invoice._id); }}
                       sx={{ mr: 1 }}
                     >
-                      Voir
+                      View
                     </Button>
                     <Button
                       variant="outlined"
@@ -202,14 +202,14 @@ const ClientBilling = () => {
           <div style={{ minHeight: 600, background: '#e5e5e5' }}>
             <div dangerouslySetInnerHTML={{ __html: invoiceHtml }} />
             <Box sx={{ mt: 3, p: 2, background: '#fff', borderRadius: 2, boxShadow: 1 }}>
-              <Typography variant="h6" sx={{ mb: 1 }}>Informations de paiement</Typography>
-              <Typography variant="body2">Bénéficiaire: Bitrix IT</Typography>
+              <Typography variant="h6" sx={{ mb: 1 }}>Payment Information</Typography>
+              <Typography variant="body2">Beneficiary: Bitrix IT</Typography>
               <Typography variant="body2">BANK: StandardBank Tyger Manor</Typography>
               <Typography variant="body2">BRANCH CODE: 050410</Typography>
               <Typography variant="body2">ACCOUNT NUMBER: 401823768</Typography>
               {!invoices.find(inv => inv._id === selectedInvoiceId)?.paid && (
                 <Box sx={{ mt: 2 }}>
-                  <Typography sx={{ mb: 1 }}>Pour marquer la facture comme payée, écrivez <b>paid</b> ci-dessous :</Typography>
+                  <Typography sx={{ mb: 1 }}>To mark the invoice as paid, type paid below:</Typography>
                   <TextField
                     value={paidInput}
                     onChange={e => { setPaidInput(e.target.value); setPaidError(''); }}
@@ -224,12 +224,12 @@ const ClientBilling = () => {
                     sx={{ mt: 2, ml: 2 }}
                     onClick={handleMarkAsPaid}
                   >
-                    Confirmer
+                    Confirm
                   </Button>
                 </Box>
               )}
               {invoices.find(inv => inv._id === selectedInvoiceId)?.paid && (
-                <Typography color="success.main" sx={{ mt: 1 }}>Facture marquée comme payée</Typography>
+                <Typography color="success.main" sx={{ mt: 1 }}>Invoice marked as paid</Typography>
               )}
             </Box>
           </div>

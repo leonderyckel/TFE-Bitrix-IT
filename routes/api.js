@@ -319,11 +319,11 @@ router.get('/invoice/html/:id', auth, async (req, res) => {
   try {
     const { Invoice, Ticket, User } = getModels();
     const invoice = await Invoice.findById(req.params.id);
-    if (!invoice) return res.status(404).json({ message: 'Facture non trouvée.' });
+    if (!invoice) return res.status(404).json({ message: 'Invoice not found.' });
 
     // Vérifie que la facture appartient bien au client connecté
     if (invoice.client.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Accès interdit.' });
+      return res.status(403).json({ message: 'Access denied.' });
     }
 
     const ticket = await Ticket.findById(invoice.ticket);
@@ -346,7 +346,7 @@ router.get('/invoice/html/:id', auth, async (req, res) => {
     const html = template(data);
     res.send(html);
   } catch (err) {
-    res.status(500).json({ message: 'Erreur lors de la génération du HTML de la facture.' });
+    res.status(500).json({ message: 'Error generating invoice HTML.' });
   }
 });
 
@@ -360,7 +360,7 @@ router.get('/billing/invoices', auth, async (req, res) => {
     const invoices = await Invoice.find({ ticket: { $in: ticketIds } }).sort({ date: -1 });
     res.json(invoices);
   } catch (err) {
-    res.status(500).json({ message: 'Erreur lors du chargement des factures.' });
+    res.status(500).json({ message: 'Error loading invoices.' });
   }
 });
 
@@ -368,15 +368,15 @@ router.patch('/invoice/mark-paid/:id', auth, async (req, res) => {
   try {
     const { Invoice } = getModels();
     const invoice = await Invoice.findById(req.params.id);
-    if (!invoice) return res.status(404).json({ message: 'Facture non trouvée.' });
+    if (!invoice) return res.status(404).json({ message: 'Invoice not found.' });
     if (invoice.client.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Accès interdit.' });
+      return res.status(403).json({ message: 'Access denied.' });
     }
     invoice.paid = true;
     await invoice.save();
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ message: 'Erreur lors de la mise à jour du statut de la facture.' });
+    res.status(500).json({ message: 'Error updating invoice status.' });
   }
 });
 

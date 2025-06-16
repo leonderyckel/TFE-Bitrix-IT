@@ -35,7 +35,7 @@ const AdminBillingHistory = () => {
         });
         setInvoices(res.data);
       } catch (err) {
-        setError('Erreur lors du chargement des factures.');
+        setError('Error loading invoices.');
       } finally {
         setLoading(false);
       }
@@ -53,7 +53,7 @@ const AdminBillingHistory = () => {
       });
       setInvoiceHtml(res.data.html || res.data);
     } catch (err) {
-      setInvoiceHtml('<div style="padding:40px;color:red;">Erreur lors du chargement de la facture.</div>');
+      setInvoiceHtml('<div style="padding:40px;color:red;">Error loading invoice.</div>');
     } finally {
       setLoadingInvoice(false);
     }
@@ -102,7 +102,7 @@ const AdminBillingHistory = () => {
       }).save();
     } catch (err) {
       console.error('Erreur lors de la génération du PDF:', err);
-      alert('Erreur lors de la génération du PDF.');
+      alert('Error generating PDF.');
     }
   };
 
@@ -148,7 +148,7 @@ const AdminBillingHistory = () => {
                       onClick={() => handleShowInvoice(invoice._id)}
                       sx={{ mr: 1 }}
                     >
-                      Voir
+                      View
                     </Button>
                     <Button
                       variant="outlined"
@@ -156,7 +156,7 @@ const AdminBillingHistory = () => {
                       size="small"
                       onClick={() => handleDownloadInvoice(invoice._id)}
                     >
-                      Télécharger
+                      Download
                     </Button>
                   </TableCell>
                 </TableRow>

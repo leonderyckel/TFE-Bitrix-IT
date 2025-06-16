@@ -39,7 +39,7 @@ const AdminBilling = () => {
         });
         setTickets(res.data);
       } catch (err) {
-        setError('Erreur lors du chargement des tickets clôturés.');
+        setError('Error loading closed tickets.');
       } finally {
         setLoading(false);
       }
@@ -64,7 +64,7 @@ const AdminBilling = () => {
         setInvoiceData(null);
       }
     } catch (err) {
-      setInvoiceHtml('<div style="padding:40px;color:red;">Erreur lors du chargement de la facture.</div>');
+      setInvoiceHtml('<div style="padding:40px;color:red;">Error loading invoice.</div>');
       setInvoiceData(null);
     } finally {
       setLoadingInvoice(false);
@@ -73,7 +73,7 @@ const AdminBilling = () => {
 
   const handleSaveInvoice = async () => {
     if (!invoiceData) {
-      alert('Impossible de sauvegarder : données facture manquantes.');
+      alert('Cannot save: missing invoice data.');
       return;
     }
     try {
@@ -87,7 +87,7 @@ const AdminBilling = () => {
         setTickets(prev => prev.map(t => t._id === ticketId ? { ...t, invoice: { ...t.invoice, saved: true } } : t));
       }
     } catch (err) {
-      alert('Erreur lors de l\'enregistrement de la facture.');
+      alert('Error saving invoice.');
     }
   };
 
@@ -103,7 +103,7 @@ const AdminBilling = () => {
         setInvoiceHtml(res.data.html);
       }
     } catch (err) {
-      setInvoiceHtml('<div style="padding:40px;color:red;">Erreur lors de la génération de la preview.</div>');
+      setInvoiceHtml('<div style="padding:40px;color:red;">Error loading preview.</div>');
     } finally {
       setLoadingInvoice(false);
     }
@@ -318,7 +318,7 @@ const AdminBilling = () => {
                 {/* Boutons d'action alignés à droite */}
                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 3, mb: 2, background: '#f8fafc', borderRadius: 2, p: 2, boxShadow: '0 1px 4px rgba(0,0,0,0.04)', justifyContent: 'flex-end' }}>
                   <Button variant="contained" color="primary" onClick={handleUpdatePreview} disabled={loadingInvoice}>
-                    {loadingInvoice ? 'Mise à jour...' : 'Update Preview'}
+                    {loadingInvoice ? 'Updating...' : 'Update Preview'}
                   </Button>
                   <Button variant="contained" color="success" type="submit">Save</Button>
                 </Box>
@@ -357,7 +357,7 @@ const AdminBilling = () => {
             </Box>
           </Box>
         ) : (
-          <div style={{ padding: 40, textAlign: 'center', color: 'red' }}>Erreur lors du chargement de la facture.</div>
+          <div style={{ padding: 40, textAlign: 'center', color: 'red' }}>Error loading invoice.</div>
         )}
       </Dialog>
     </Box>
