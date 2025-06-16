@@ -158,7 +158,14 @@ function AppContent() {
       <Route path="/register" element={<Register />} />
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/" element={<Layout />}>
-        <Route index element={<Navigate to="/tickets" replace />} />
+        <Route 
+          index 
+          element={
+            <PrivateRoute>
+              <Navigate to="/tickets" replace />
+            </PrivateRoute>
+          } 
+        />
         <Route 
           path="dashboard" 
           element={
