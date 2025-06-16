@@ -29,11 +29,12 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(allSpecs));
 
 // --- CORS origins setup ---
 const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? [process.env.FRONTEND_URL]
+  ? [process.env.FRONTEND_URL, 'https://bitrix.mainserver.co.za']
   : [
       'http://localhost:3000',
       'http://localhost:3001',
-      'http://localhost:3002'
+      'http://localhost:3002',
+      'https://bitrix.mainserver.co.za'
     ];
 
 // --- Socket.io Setup ---
@@ -41,7 +42,8 @@ const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: true,
+    allowedHeaders: ["Authorization", "Content-Type"]
   }
 });
 
@@ -49,9 +51,11 @@ const io = new Server(server, {
 io.use(async (socket, next) => {
   const token = socket.handshake.auth.token;
   if (!token) {
+    console.log('Socket connection attempt without token');
     return next(new Error('Authentication error: No token'));
   }
   try {
+    console.log('Verifying socket token...');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const { User, AdminUser } = getModels();
     let user;
@@ -61,11 +65,14 @@ io.use(async (socket, next) => {
       user = await User.findById(decoded.id).select('-password');
     }
     if (!user) {
+      console.log('Socket authentication failed: User not found');
       return next(new Error('Authentication error: User not found'));
     }
+    console.log('Socket authenticated successfully for user:', user._id);
     socket.user = user;
     next();
   } catch (err) {
+    console.error('Socket authentication error:', err.message);
     return next(new Error('Authentication error: Invalid token'));
   }
 });

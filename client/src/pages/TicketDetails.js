@@ -58,7 +58,7 @@ function TicketDetails() {
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
   const [liveTicket, setLiveTicket] = useState(null);
-  const socket = useSocket();
+  const { socket, isReady } = useSocket();
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentError, setCommentError] = useState(null);
@@ -67,6 +67,8 @@ function TicketDetails() {
     if (ticketId) {
       dispatch(fetchTicket({ ticketId, isAdmin: false }));
     }
+
+    if (!socket || !isReady) return;
 
     socket.emit('joinTicketRoom', ticketId);
     console.log('Emitted joinTicketRoom for:', ticketId);
@@ -93,7 +95,7 @@ function TicketDetails() {
       socket.off('ticket:updated', handleTicketUpdated);
       console.log('Left room and cleaned up listeners for:', ticketId);
     };
-  }, [ticketId, dispatch, enqueueSnackbar, socket]);
+  }, [ticketId, dispatch, enqueueSnackbar, socket, isReady]);
 
   const displayTicketData = liveTicket || currentTicket;
 

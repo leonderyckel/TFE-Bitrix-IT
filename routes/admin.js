@@ -1658,26 +1658,26 @@ router.delete('/clients/:clientId', async (req, res) => {
   if (!allowedRoles.includes(req.admin.role)) {
     return res.status(403).json({ message: 'Forbidden: Only admins or technicians can delete clients.' });
   }
-  try {
-    const { User, Ticket } = getModels();
-    const { clientId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(clientId)) {
-      return res.status(400).json({ message: 'Invalid client ID format' });
-    }
-    const client = await User.findById(clientId);
-    if (!client || client.role !== 'client') {
-      return res.status(404).json({ message: 'Client not found' });
-    }
-    const associatedTickets = await Ticket.countDocuments({ client: clientId });
-    if (associatedTickets > 0) {
-      return res.status(400).json({ message: `Cannot delete client: They have ${associatedTickets} associated ticket(s). Reassign or delete tickets first.` });
-    }
-    await User.findByIdAndDelete(clientId);
-    res.status(200).json({ message: 'Client deleted successfully' });
-  } catch (error) {
+    try {
+        const { User, Ticket } = getModels();
+        const { clientId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(clientId)) {
+            return res.status(400).json({ message: 'Invalid client ID format' });
+        }
+        const client = await User.findById(clientId);
+        if (!client || client.role !== 'client') {
+            return res.status(404).json({ message: 'Client not found' });
+        }
+        const associatedTickets = await Ticket.countDocuments({ client: clientId });
+        if (associatedTickets > 0) {
+             return res.status(400).json({ message: `Cannot delete client: They have ${associatedTickets} associated ticket(s). Reassign or delete tickets first.` });
+        }
+        await User.findByIdAndDelete(clientId);
+        res.status(200).json({ message: 'Client deleted successfully' });
+    } catch (error) {
     console.error('Error deleting client by admin/technician:', error);
-    res.status(500).json({ message: 'Server error while deleting client', error: error.message });
-  }
+        res.status(500).json({ message: 'Server error while deleting client', error: error.message });
+    }
 });
 
 // --- END CLIENT CRUD ---
@@ -2711,7 +2711,7 @@ router.get('/invoice/html/:id', async (req, res) => {
     res.send(html);
   } catch (err) {
     res.status(500).json({ message: 'Error generating invoice HTML.' });
-  }
+    }
 });
 
 module.exports = router; 

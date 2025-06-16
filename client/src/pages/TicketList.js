@@ -43,10 +43,12 @@ const TicketList = () => {
   const socketRef = useRef();
   const joinedRoomsRef = useRef(new Set());
   const { enqueueSnackbar } = useSnackbar();
-  const socket = useSocket();
+  const { socket, isReady } = useSocket();
 
   useEffect(() => {
     dispatch(fetchTickets());
+
+    if (!socket || !isReady) return;
 
     socket.on('connect', () => {
       console.log('[TicketList] Socket connected:', socket.id);
@@ -88,10 +90,10 @@ const TicketList = () => {
       socket.off('ticket:updated', handleTicketUpdated);
       console.log('[TicketList] Socket and listeners cleaned up.');
     };
-  }, [dispatch, enqueueSnackbar, navigate, socket]);
+  }, [dispatch, enqueueSnackbar, navigate, socket, isReady]);
 
   useEffect(() => {
-    if (!socket || !socket.connected) return;
+    if (!socket || !isReady) return;
 
     // Combine all visible ticket IDs
     const currentTicketIds = new Set([
@@ -119,7 +121,7 @@ const TicketList = () => {
     });
 
     joinedRoomsRef.current = previouslyJoined;
-  }, [myTickets, companyTickets]);
+  }, [myTickets, companyTickets, socket, isReady]);
 
   const getStatusColor = (status) => {
     switch (status) {

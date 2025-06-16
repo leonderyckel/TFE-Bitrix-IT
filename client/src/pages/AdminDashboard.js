@@ -29,13 +29,11 @@ function AdminDashboard() {
   const [technicians, setTechnicians] = useState([]);
   const [selectedTechnicianFilter, setSelectedTechnicianFilter] = useState('all');
   const navigate = useNavigate();
-  const socket = useSocket();
+  const { socket, isReady } = useSocket();
 
   // Wrap fetchTickets in useCallback to avoid recreating it on every render
   const fetchTickets = useCallback(async () => {
     try {
-      // Don't set loading to true here if we are just refreshing
-      // setLoading(true); 
       const response = await axios.get(`${API_URL}/admin/tickets`, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -45,10 +43,9 @@ function AdminDashboard() {
     } catch (error) {
       console.error('Error fetching tickets:', error);
     } finally {
-      // Ensure loading is set to false after fetch, even if it was just a refresh
       setLoading(false);
     }
-  }, [token]); // Dependency: token
+  }, [token]);
 
   useEffect(() => {
     const fetchTechnicians = async () => {
@@ -69,6 +66,8 @@ function AdminDashboard() {
     fetchTickets(); // Initial fetch
     fetchTechnicians();
 
+    if (!socket || !isReady) return;
+
     // --- Socket.IO Setup ---
     socket.on('connect', () => {
       console.log('[AdminDashboard] Socket connected:', socket.id);
@@ -85,7 +84,6 @@ function AdminDashboard() {
     socket.on('admin:newTicket', ({ ticketId }) => {
       console.log('[AdminDashboard] Received admin:newTicket', ticketId);
       // Re-fetch the entire list when a new ticket is created
-      // Could potentially just add the new ticket to the state for optimization
       fetchTickets(); 
     });
 
@@ -99,7 +97,12 @@ function AdminDashboard() {
       );
     });
 
-  }, [fetchTickets, token, socket]); // Include fetchTickets and token
+    return () => {
+      socket.off('admin:newTicket');
+      socket.off('ticket:updated');
+      socket.emit('leaveAdminRoom');
+    };
+  }, [fetchTickets, token, socket, isReady]);
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
