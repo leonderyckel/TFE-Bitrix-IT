@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useNavigate, Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Container,
@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
-import { login } from '../store/slices/authSlice';
+import { login, clearRegistrationSuccess } from '../store/slices/authSlice';
 import Logo from '../components/Logo';
 import {
   Visibility as VisibilityIcon,
@@ -35,8 +35,20 @@ const validationSchema = yup.object({
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { loading, error, isAuthenticated, user } = useSelector((state) => state.auth);
   const [showPassword, setShowPassword] = useState(false);
+  const [showRegistrationSuccess, setShowRegistrationSuccess] = useState(false);
+
+  useEffect(() => {
+    // Vérifier si l'utilisateur vient de s'inscrire
+    if (searchParams.get('registered') === 'true') {
+      setShowRegistrationSuccess(true);
+      dispatch(clearRegistrationSuccess());
+      // Nettoyer l'URL
+      window.history.replaceState({}, document.title, '/login');
+    }
+  }, [searchParams, dispatch]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -105,6 +117,11 @@ const Login = () => {
           <Typography component="h1" variant="h5">
             Client Login
           </Typography>
+          {showRegistrationSuccess && (
+            <Alert severity="success" sx={{ mt: 2, width: '100%' }}>
+              Account created successfully! You can now sign in with your credentials.
+            </Alert>
+          )}
           {error && (
             <Alert severity="error" sx={{ mt: 2, width: '100%' }}>
               {getErrorMessage(error)}

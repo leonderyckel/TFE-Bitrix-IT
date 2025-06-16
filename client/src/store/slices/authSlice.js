@@ -76,7 +76,8 @@ const initialState = {
   isAuthenticated: false,
   loading: false,
   error: null,
-  isAdmin: localStorage.getItem('isAdmin') === 'true'
+  isAdmin: localStorage.getItem('isAdmin') === 'true',
+  registrationSuccess: false
 };
 
 const authSlice = createSlice({
@@ -121,6 +122,9 @@ const authSlice = createSlice({
     },
     clearError: (state) => {
       state.error = null;
+    },
+    clearRegistrationSuccess: (state) => {
+      state.registrationSuccess = false;
     }
   },
   extraReducers: (builder) => {
@@ -169,14 +173,15 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(register.fulfilled, (state, action) => {
-        state.user = action.payload.user;
-        state.token = action.payload.token;
-        state.isAuthenticated = true;
+        // Ne pas connecter automatiquement l'utilisateur
+        state.user = null;
+        state.token = null;
+        state.isAuthenticated = false;
         state.loading = false;
         state.error = null;
         state.isAdmin = false;
-        localStorage.setItem('token', action.payload.token);
-        localStorage.setItem('isAdmin', 'false');
+        state.registrationSuccess = true;
+        // Ne pas sauvegarder le token dans localStorage
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
@@ -211,7 +216,8 @@ export const {
   loginFailure,
   logout,
   loadUser,
-  clearError
+  clearError,
+  clearRegistrationSuccess
 } = authSlice.actions;
 
 export default authSlice.reducer; 

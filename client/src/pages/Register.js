@@ -53,13 +53,20 @@ const validationSchema = yup.object({
 const Register = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading, error, isAuthenticated } = useSelector((state) => state.auth);
+  const { loading, error, isAuthenticated, registrationSuccess } = useSelector((state) => state.auth);
 
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/tickets');
     }
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (registrationSuccess) {
+      // Rediriger vers la page de connexion avec un paramètre de succès
+      navigate('/login?registered=true');
+    }
+  }, [registrationSuccess, navigate]);
 
   const getServerErrorMessage = (error) => {
     if (typeof error === 'string') {
