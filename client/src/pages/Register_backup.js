@@ -19,23 +19,16 @@ import { register, loginSuccess } from '../store/slices/authSlice';
 const validationSchema = yup.object({
   email: yup
     .string()
-    .email('Please enter a valid email address')
+    .email('Enter a valid email')
     .required('Email is required'),
   password: yup
     .string()
-    .min(8, 'Password must be at least 8 characters long')
-    .matches(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .matches(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .matches(/[0-9]/, 'Password must contain at least one number')
-    .matches(/[^A-Za-z0-9]/, 'Password must contain at least one special character')
     .required('Password is required'),
   firstName: yup
     .string()
-    .min(2, 'First name must be at least 2 characters long')
     .required('First name is required'),
   lastName: yup
     .string()
-    .min(2, 'Last name must be at least 2 characters long')
     .required('Last name is required'),
   role: yup
     .string()
@@ -44,7 +37,7 @@ const validationSchema = yup.object({
     .string()
     .when('role', {
       is: 'client',
-      then: (schema) => schema.min(2, 'Company name must be at least 2 characters long').required('Company is required for clients'),
+      then: (schema) => schema.required('Company is required for clients'),
       otherwise: (schema) => schema.notRequired(),
     }),
   vat: yup.string(),
@@ -60,32 +53,6 @@ const Register = () => {
       navigate('/tickets');
     }
   }, [isAuthenticated, navigate]);
-
-  const getServerErrorMessage = (error) => {
-    if (typeof error === 'string') {
-      // Check for specific error types and provide clear guidance
-      if (error.toLowerCase().includes('user already exists') || error.toLowerCase().includes('already')) {
-        return 'An account with this email already exists. Please try logging in or use a different email address.';
-      }
-      if (error.toLowerCase().includes('email') && error.toLowerCase().includes('invalid')) {
-        return 'Please enter a valid email address.';
-      }
-      if (error.toLowerCase().includes('password')) {
-        if (error.includes('shorter than the minimum')) {
-          return 'Password is too short. Please use at least 8 characters.';
-        }
-        if (error.includes('validation failed')) {
-          return 'Password does not meet security requirements. Please ensure it contains at least 8 characters, including uppercase, lowercase, numbers, and special characters.';
-        }
-        return 'Password does not meet the required criteria. Please check the password requirements below.';
-      }
-      if (error.toLowerCase().includes('company') || error.toLowerCase().includes('required')) {
-        return 'Please fill in all required fields correctly.';
-      }
-      return error;
-    }
-    return 'An error occurred during registration. Please check your information and try again.';
-  };
 
   const formik = useFormik({
     initialValues: {
@@ -136,7 +103,7 @@ const Register = () => {
           </Typography>
           {error && (
             <Alert severity="error" sx={{ mt: 2, width: '100%' }}>
-              {getServerErrorMessage(error)}
+              {error}
             </Alert>
           )}
           <Box

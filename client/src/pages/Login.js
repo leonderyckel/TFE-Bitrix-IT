@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -10,17 +10,22 @@ import {
   Link,
   Alert,
   Paper,
-  Divider
+  Divider,
+  IconButton
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
 import { login } from '../store/slices/authSlice';
 import Logo from '../components/Logo';
+import {
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon
+} from '@mui/icons-material';
 
 const validationSchema = yup.object({
   email: yup
     .string()
-    .email('Enter a valid email')
+    .email('Please enter a valid email address')
     .required('Email is required'),
   password: yup
     .string()
@@ -31,6 +36,7 @@ const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { loading, error, isAuthenticated, user } = useSelector((state) => state.auth);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -41,6 +47,25 @@ const Login = () => {
       }
     }
   }, [isAuthenticated, navigate, user]);
+
+  const getErrorMessage = (error) => {
+    if (typeof error === 'string') {
+      if (error.toLowerCase().includes('invalid credentials') || 
+          error.toLowerCase().includes('identifiants invalides')) {
+        return 'Invalid email or password. Please check your login credentials.';
+      }
+      if (error.toLowerCase().includes('user not found') || 
+          error.toLowerCase().includes('utilisateur non trouvé')) {
+        return 'No account found with this email address. Please check the email or create an account.';
+      }
+      if (error.toLowerCase().includes('password') || 
+          error.toLowerCase().includes('mot de passe')) {
+        return 'Incorrect password. Please make sure you enter the correct password.';
+      }
+      return error;
+    }
+    return 'An error occurred during login. Please try again.';
+  };
 
   const formik = useFormik({
     initialValues: {
@@ -82,7 +107,7 @@ const Login = () => {
           </Typography>
           {error && (
             <Alert severity="error" sx={{ mt: 2, width: '100%' }}>
-              {error}
+              {getErrorMessage(error)}
             </Alert>
           )}
           <Box
@@ -106,12 +131,22 @@ const Login = () => {
               id="password"
               name="password"
               label="Password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={formik.values.password}
               onChange={formik.handleChange}
               error={formik.touched.password && Boolean(formik.errors.password)}
               helperText={formik.touched.password && formik.errors.password}
               margin="normal"
+              InputProps={{
+                endAdornment: (
+                  <IconButton
+                    onClick={() => setShowPassword(!showPassword)}
+                    edge="end"
+                  >
+                    {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                )
+              }}
             />
             <Button
               type="submit"
