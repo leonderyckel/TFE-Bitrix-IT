@@ -19,10 +19,16 @@ import {
   Card,
   CardContent,
   useTheme,
-  CircularProgress
+  CircularProgress,
+  useMediaQuery,
+  IconButton,
+  Collapse,
+  Stack,
+  Divider
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import UpdateIcon from '@mui/icons-material/Update';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useSnackbar } from 'notistack';
 import { fetchTickets, updateTicketInList, addNewTicketToList } from '../store/slices/ticketSlice';
 import { addNotification } from '../store/slices/notificationSlice';
@@ -44,6 +50,8 @@ const TicketList = () => {
   const joinedRoomsRef = useRef(new Set());
   const { enqueueSnackbar } = useSnackbar();
   const { socket, isReady } = useSocket();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [expandedTicket, setExpandedTicket] = useState(null);
 
   useEffect(() => {
     dispatch(fetchTickets());
@@ -414,6 +422,189 @@ const TicketList = () => {
     </TableRow>
   );
 
+  // Mobile ticket card component
+  const renderMobileTicketCard = (ticket) => (
+    <Card 
+      key={ticket._id} 
+      sx={{ 
+        mb: 2, 
+        boxShadow: 2,
+        '&:hover': { boxShadow: 4 },
+        borderLeft: `4px solid ${theme.palette[getPriorityColor(ticket.priority)].main}`,
+        cursor: 'pointer'
+      }}
+      onClick={() => navigate(`/tickets/${ticket._id}`)}
+    >
+      <CardContent sx={{ p: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'primary.main' }}>
+              Ticket #{ticket._id.substring(0, 8).toUpperCase()}
+            </Typography>
+            <Chip 
+              label={ticket.status} 
+              color={getStatusColor(ticket.status)} 
+              size="small"
+              sx={{ mt: 1, fontWeight: 'bold' }}
+            />
+          </Box>
+          <Chip 
+            label={ticket.priority} 
+            color={getPriorityColor(ticket.priority)} 
+            size="small"
+            sx={{ fontWeight: 'bold' }}
+          />
+        </Box>
+        
+        <Typography variant="body1" sx={{ mb: 2, fontWeight: 500, fontSize: '1rem' }}>
+          {ticket.title}
+        </Typography>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Chip 
+            label={ticket.category} 
+            variant="outlined" 
+            size="small"
+            sx={{ fontSize: '0.75rem' }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {new Date(ticket.createdAt).toLocaleDateString('en-US')}
+          </Typography>
+        </Box>
+        
+        {/* Progress for mobile */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+            Progress: {getActiveStepIndex(ticket) + 1}/{getCompletedSteps(ticket).length} steps
+          </Typography>
+          <Box sx={{ 
+            height: 8, 
+            backgroundColor: 'grey.300', 
+            borderRadius: 4,
+            overflow: 'hidden',
+            position: 'relative'
+          }}>
+            <Box sx={{ 
+              height: '100%', 
+              backgroundColor: ticket.status === 'closed' ? 'success.main' : 'primary.main',
+              width: `${((getActiveStepIndex(ticket) + 1) / getCompletedSteps(ticket).length) * 100}%`,
+              transition: 'width 0.3s ease'
+            }} />
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+            Current status: {getCompletedSteps(ticket)[getActiveStepIndex(ticket)]}
+          </Typography>
+        </Box>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Button 
+            variant="contained" 
+            size="small"
+            sx={{ minHeight: '36px', px: 3 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/tickets/${ticket._id}`);
+            }}
+          >
+            View Details
+          </Button>
+          <IconButton
+            aria-label="toggle description"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpandedTicket(expandedTicket === ticket._id ? null : ticket._id);
+            }}
+            size="small"
+            sx={{ 
+              transform: expandedTicket === ticket._id ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.3s ease'
+            }}
+          >
+            <ExpandMoreIcon />
+          </IconButton>
+        </Box>
+        
+        <Collapse in={expandedTicket === ticket._id}>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.9rem' }}>
+            <strong>Description:</strong><br />
+            {ticket.description}
+          </Typography>
+        </Collapse>
+      </CardContent>
+    </Card>
+  );
+
+  // Mobile company ticket card component
+  const renderMobileCompanyTicketCard = (ticket) => (
+    <Card 
+      key={ticket._id} 
+      sx={{ 
+        mb: 2, 
+        boxShadow: 2,
+        '&:hover': { boxShadow: 4 },
+        borderLeft: `4px solid ${theme.palette[getPriorityColor(ticket.priority)].main}`,
+        cursor: 'pointer'
+      }}
+      onClick={() => navigate(`/tickets/${ticket._id}`)}
+    >
+      <CardContent sx={{ p: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'primary.main' }}>
+              Ticket #{ticket._id.substring(0, 8).toUpperCase()}
+            </Typography>
+            <Chip 
+              label={ticket.status} 
+              color={getStatusColor(ticket.status)} 
+              size="small"
+              sx={{ mt: 1, fontWeight: 'bold' }}
+            />
+          </Box>
+          <Chip 
+            label={ticket.priority} 
+            color={getPriorityColor(ticket.priority)} 
+            size="small"
+            sx={{ fontWeight: 'bold' }}
+          />
+        </Box>
+        
+        <Typography variant="body1" sx={{ mb: 1, fontWeight: 500, fontSize: '1rem' }}>
+          {ticket.title}
+        </Typography>
+        
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block', fontStyle: 'italic' }}>
+          Created by: {ticket.client ? `${ticket.client.firstName} ${ticket.client.lastName}` : 'N/A'}
+        </Typography>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Chip 
+            label={ticket.category} 
+            variant="outlined" 
+            size="small"
+            sx={{ fontSize: '0.75rem' }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {new Date(ticket.createdAt).toLocaleDateString('en-US')}
+          </Typography>
+        </Box>
+        
+        <Button 
+          variant="contained" 
+          size="small"
+          fullWidth
+          sx={{ minHeight: '36px' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/tickets/${ticket._id}`);
+          }}
+        >
+          View Details
+        </Button>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <Box sx={{ position: 'relative', pb: 4 }}>
       <Box sx={{ 
@@ -424,9 +615,11 @@ const TicketList = () => {
         backgroundColor: theme.palette.primary.main,
         borderRadius: '8px',
         color: 'white',
-        p: 2
+        p: 2,
+        flexDirection: { xs: 'column', sm: 'row' },
+        gap: { xs: 2, sm: 0 }
       }}>
-        <Typography variant="h5" sx={{ fontWeight: 'bold', pl: 1 }}>
+        <Typography variant="h5" sx={{ fontWeight: 'bold', pl: { xs: 0, sm: 1 } }}>
           Your Tickets
         </Typography>
         <Button
@@ -441,61 +634,80 @@ const TicketList = () => {
               transform: 'translateY(-2px)',
               boxShadow: '0 6px 12px rgba(0,0,0,0.15)',
             },
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            width: { xs: '100%', sm: 'auto' }
           }}
         >
           New Ticket
         </Button>
       </Box>
       
-      <Card elevation={3}>
-        <CardContent sx={{ p: 0 }}>
-          <TableContainer>
-            <Table>
-              <TableHead sx={{ backgroundColor: theme.palette.grey[100] }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold', width: '8%' }}>ID</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>Title</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Priority</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Category</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Creation Date</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '22%', minWidth: 200 }}>Progress</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: 'right' }}></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {loading ? (
+      {/* Mobile View */}
+      {isMobile ? (
+        <Box>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : myTickets && myTickets.length > 0 ? (
+            myTickets.map(renderMobileTicketCard)
+          ) : (
+            <Card sx={{ textAlign: 'center', p: 3 }}>
+              <Typography variant="body1" color="text.secondary">
+                You have no tickets.
+              </Typography>
+            </Card>
+          )}
+        </Box>
+      ) : (
+        /* Desktop Table View */
+        <Card elevation={3}>
+          <CardContent sx={{ p: 0 }}>
+            <TableContainer>
+              <Table>
+                <TableHead sx={{ backgroundColor: theme.palette.grey[100] }}>
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
-                      <CircularProgress />
-                    </TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '8%' }}>ID</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>Title</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Priority</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Category</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Creation Date</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '22%', minWidth: 200 }}>Progress</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: 'right' }}></TableCell>
                   </TableRow>
-                ) : myTickets && myTickets.length > 0 ? (
-                  myTickets.map(renderTicketRow)
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={8} align="center">
-                      You have no tickets.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
+                </TableHead>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center">
+                        <CircularProgress />
+                      </TableCell>
+                    </TableRow>
+                  ) : myTickets && myTickets.length > 0 ? (
+                    myTickets.map(renderTicketRow)
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center">
+                        You have no tickets.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* --- Company Tickets Section --- */}
       {companyTickets && companyTickets.length > 0 && (
-        <Box sx={{ mt: 4 }}> {/* Add margin top */}
-          {/* Apply blue banner style to the title */}
+        <Box sx={{ mt: 4 }}>
           <Box sx={{
-            // Copy styles from the "Your Tickets" header box
             display: 'flex',
-            justifyContent: 'space-between', // Keep or remove if no button on the right
+            justifyContent: 'space-between',
             alignItems: 'center',
-            mb: 3, // Add margin bottom like the first header
+            mb: 3,
             backgroundColor: theme.palette.primary.main,
             borderRadius: '8px',
             color: 'white',
@@ -504,32 +716,39 @@ const TicketList = () => {
             <Typography variant="h5" sx={{ fontWeight: 'bold', pl: 1 }}>
               Company Tickets
             </Typography>
-            {/* Add any buttons here if needed */}
           </Box>
           
-          <Card elevation={3}>
-            <CardContent sx={{ p: 0 }}>
-              <TableContainer>
-                <Table>
-                  <TableHead sx={{ backgroundColor: theme.palette.grey[100] }}>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 'bold', width: '8%' }}>ID</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold', width: '22%' }}>Title</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Created By</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Status</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Priority</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Category</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Creation Date</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: 'right' }}></TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {companyTickets.map(renderCompanyTicketRow)}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </CardContent>
-          </Card>
+          {/* Mobile View for Company Tickets */}
+          {isMobile ? (
+            <Box>
+              {companyTickets.map(renderMobileCompanyTicketCard)}
+            </Box>
+          ) : (
+            /* Desktop Table View for Company Tickets */
+            <Card elevation={3}>
+              <CardContent sx={{ p: 0 }}>
+                <TableContainer>
+                  <Table>
+                    <TableHead sx={{ backgroundColor: theme.palette.grey[100] }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold', width: '8%' }}>ID</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', width: '22%' }}>Title</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Created By</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Priority</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>Category</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Creation Date</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: 'right' }}></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {companyTickets.map(renderCompanyTicketRow)}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          )}
         </Box>
       )}
 

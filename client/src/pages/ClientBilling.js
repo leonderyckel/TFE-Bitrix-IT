@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, CircularProgress } from '@mui/material';
+import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, CircularProgress, Card, CardContent, Chip, Stack, useMediaQuery, useTheme } from '@mui/material';
 import axios from 'axios';
 import API_URL from '../config/api';
 import html2pdf from 'html2pdf.js';
@@ -22,6 +22,9 @@ const ClientBilling = () => {
   const [paidError, setPaidError] = useState('');
   const [paidDialogOpen, setPaidDialogOpen] = useState(false);
   const [paidDialogInvoice, setPaidDialogInvoice] = useState(null);
+  
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -121,68 +124,161 @@ const ClientBilling = () => {
     }
   };
 
+  // Mobile invoice card component
+  const renderMobileInvoiceCard = (invoice) => (
+    <Card 
+      key={invoice._id} 
+      sx={{ 
+        mb: 2, 
+        boxShadow: 2,
+        '&:hover': { boxShadow: 4 }
+      }}
+    >
+      <CardContent sx={{ p: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'primary.main' }}>
+              {invoice.invoiceNumber}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {invoice.date}
+            </Typography>
+          </Box>
+          {invoice.paid ? (
+            <Chip 
+              label="PAID" 
+              color="success" 
+              size="small"
+              sx={{ fontWeight: 'bold' }}
+            />
+          ) : (
+            <Chip 
+              label="UNPAID" 
+              color="warning" 
+              size="small"
+              sx={{ fontWeight: 'bold' }}
+            />
+          )}
+        </Box>
+        
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+          Amount: {invoice.totalDue || invoice.amount || '-'}
+        </Typography>
+        
+        <Stack spacing={1}>
+          <Button 
+            variant="contained" 
+            color="primary"
+            size="small"
+            fullWidth
+            onClick={() => { handleShowInvoice(invoice._id); setSelectedInvoiceId(invoice._id); }}
+            sx={{ minHeight: '40px' }}
+          >
+            View Invoice
+          </Button>
+          <Button 
+            variant="outlined" 
+            color="secondary"
+            size="small"
+            fullWidth
+            onClick={() => handleDownloadInvoice(invoice._id)}
+            sx={{ minHeight: '40px' }}
+          >
+            Download PDF
+          </Button>
+          {!invoice.paid && (
+            <Button 
+              variant="contained" 
+              color="success"
+              size="small"
+              fullWidth
+              onClick={() => handlePaidClick(invoice._id)}
+              sx={{ minHeight: '40px', fontWeight: 'bold' }}
+            >
+              PAY
+            </Button>
+          )}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <Box sx={{ p: 4 }}>
-      <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>
+    <Box sx={{ p: { xs: 2, sm: 4 } }}>
+      <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold', fontSize: { xs: '1.5rem', sm: '2rem' } }}>
         Billing
       </Typography>
       {loading ? (
-        <CircularProgress />
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <CircularProgress />
+        </Box>
       ) : error ? (
         <Typography color="error">{error}</Typography>
       ) : invoices.length === 0 ? (
-        <Typography>No invoices found.</Typography>
+        <Card sx={{ textAlign: 'center', p: 3 }}>
+          <Typography>No invoices found.</Typography>
+        </Card>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Number</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Amount</TableCell>
-                <TableCell>Action</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {invoices.map((invoice) => (
-                <TableRow key={invoice._id}>
-                  <TableCell>{invoice.invoiceNumber}</TableCell>
-                  <TableCell>{invoice.date}</TableCell>
-                  <TableCell>{invoice.totalDue || invoice.amount || '-'}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      size="small"
-                      onClick={() => { handleShowInvoice(invoice._id); setSelectedInvoiceId(invoice._id); }}
-                      sx={{ mr: 1 }}
-                    >
-                      View
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="secondary"
-                      size="small"
-                      onClick={() => handleDownloadInvoice(invoice._id)}
-                      sx={{ mr: 1 }}
-                    >
-                      Download
-                    </Button>
-                    <Button
-                      variant="contained"
-                      color="success"
-                      size="small"
-                      disabled={invoice.paid}
-                      onClick={() => handlePaidClick(invoice._id)}
-                    >
-                      PAY
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <>
+          {/* Mobile View */}
+          {isMobile ? (
+            <Box>
+              {invoices.map(renderMobileInvoiceCard)}
+            </Box>
+          ) : (
+            /* Desktop Table View */
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Number</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Amount</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Action</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {invoices.map((invoice) => (
+                    <TableRow key={invoice._id}>
+                      <TableCell>{invoice.invoiceNumber}</TableCell>
+                      <TableCell>{invoice.date}</TableCell>
+                      <TableCell>{invoice.totalDue || invoice.amount || '-'}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          onClick={() => { handleShowInvoice(invoice._id); setSelectedInvoiceId(invoice._id); }}
+                          sx={{ mr: 1 }}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="secondary"
+                          size="small"
+                          onClick={() => handleDownloadInvoice(invoice._id)}
+                          sx={{ mr: 1 }}
+                        >
+                          Download
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="success"
+                          size="small"
+                          disabled={invoice.paid}
+                          onClick={() => handlePaidClick(invoice._id)}
+                        >
+                          PAY
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </>
       )}
       <Dialog open={showInvoice} onClose={() => setShowInvoice(false)} maxWidth="lg" fullWidth
         PaperProps={{
