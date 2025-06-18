@@ -301,6 +301,8 @@ router.post('/auth/login', userController.login);
 router.get('/auth/me', auth, userController.getMe);
 
 // User routes
+router.get('/users/me', auth, userController.getMe);
+router.put('/users/profile', auth, userController.updateProfile);
 router.put('/users/credentials', auth, userController.updateCredentials);
 
 // Ticket routes

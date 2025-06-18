@@ -17,7 +17,8 @@ import {
   ListItemButton,
   useTheme,
   IconButton,
-  Badge
+  Badge,
+  CircularProgress
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -32,7 +33,11 @@ import {
   Menu as MenuIcon,
   Business as CompanyIcon,
   Receipt as ReceiptIcon,
-  History as HistoryIcon
+  History as HistoryIcon,
+  ConfirmationNumber as ConfirmationNumberIcon,
+  Add as AddIcon,
+  AdminPanelSettings as AdminPanelSettingsIcon,
+  Payment as PaymentIcon
 } from '@mui/icons-material';
 import { logout } from '../store/slices/authSlice';
 import { 
@@ -41,6 +46,8 @@ import {
   markNotificationAsRead
 } from '../store/slices/notificationSlice';
 import Logo from './Logo';
+import axios from 'axios';
+import API_URL from '../config/api';
 
 const drawerWidth = 260;
 
@@ -83,6 +90,11 @@ const Layout = () => {
 
   const handleMenuCloseUser = () => {
     setAnchorElUser(null);
+  };
+
+  const handleProfileClick = () => {
+    navigate('/profile');
+    handleMenuCloseUser();
   };
 
   const handleMenuOpenNotif = (event) => {
@@ -286,7 +298,7 @@ const Layout = () => {
             anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
           >
-            <MenuItem onClick={handleMenuCloseUser}>
+            <MenuItem onClick={handleProfileClick}>
               <ListItemIcon>
                 <PersonIcon fontSize="small" />
               </ListItemIcon>

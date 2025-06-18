@@ -33,6 +33,7 @@ import AdminCompanyLayout from './pages/AdminCompanyLayout';
 import AdminBilling from './pages/AdminBilling';
 import AdminBillingHistory from './pages/AdminBillingHistory';
 import ClientBilling from './pages/ClientBilling';
+import Profile from './pages/Profile';
 
 // Create theme
 const theme = createTheme({
@@ -225,7 +226,7 @@ function AppContent() {
         <Route 
           path="admin/settings" 
           element={
-            <PrivateRoute roles={['admin']}>
+            <PrivateRoute roles={['admin', 'technician']}>
               <AdminSettings />
             </PrivateRoute>
           } 
@@ -291,6 +292,14 @@ function AppContent() {
           element={
             <PrivateRoute roles={['client']}>
               <ClientBilling />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="profile" 
+          element={
+            <PrivateRoute>
+              <Profile />
             </PrivateRoute>
           } 
         />

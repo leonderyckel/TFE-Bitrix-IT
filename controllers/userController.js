@@ -173,4 +173,80 @@ exports.updateCredentials = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Error updating credentials', error: error.message });
   }
+};
+
+// Update user profile
+exports.updateProfile = async (req, res) => {
+  try {
+    const { User } = getModels();
+    const { firstName, lastName, email, company, vat, address, currentPassword, newPassword } = req.body;
+    
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Mettre à jour les champs de base
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
+    if (email) user.email = email;
+    if (company !== undefined) user.company = company;
+    if (vat !== undefined) user.vat = vat;
+    if (address !== undefined) user.address = address;
+
+    // Gérer le changement de mot de passe
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ message: 'Current password is required to change password' });
+      }
+      
+      // Valider la force du nouveau mot de passe
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+      }
+      if (!/[A-Z]/.test(newPassword)) {
+        return res.status(400).json({ message: 'Password must contain at least one uppercase letter' });
+      }
+      if (!/[a-z]/.test(newPassword)) {
+        return res.status(400).json({ message: 'Password must contain at least one lowercase letter' });
+      }
+      if (!/[0-9]/.test(newPassword)) {
+        return res.status(400).json({ message: 'Password must contain at least one number' });
+      }
+      if (!/[^A-Za-z0-9]/.test(newPassword)) {
+        return res.status(400).json({ message: 'Password must contain at least one special character' });
+      }
+      
+      const bcrypt = require('bcryptjs');
+      const userWithPassword = await User.findById(req.user.id).select('+password');
+      const isValidPassword = await bcrypt.compare(currentPassword, userWithPassword.password);
+      if (!isValidPassword) {
+        return res.status(400).json({ message: 'Current password is incorrect' });
+      }
+      
+      // Le hachage du mot de passe sera fait automatiquement par le pre-save middleware
+      user.password = newPassword;
+    }
+
+    await user.save();
+
+    // Retourner les données mises à jour (sans le mot de passe)
+    res.json({
+      id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      company: user.company,
+      vat: user.vat,
+      address: user.address,
+      role: 'client',
+      isCompanyBoss: user.isCompanyBoss
+    });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Email already in use' });
+    }
+    res.status(500).json({ message: 'Error updating profile', error: error.message });
+  }
 }; 

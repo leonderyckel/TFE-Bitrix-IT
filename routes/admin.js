@@ -224,7 +224,7 @@ router.post('/login', (req, res, next) => {
 router.use(adminAuth);
 
 // Récupérer le profil admin
-router.get('/profile', (req, res) => {
+router.get('/profile', adminAuth, (req, res) => {
   try {
     // req.admin est défini par le middleware adminAuth
     const admin = req.admin;
@@ -245,6 +245,77 @@ router.get('/profile', (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching admin profile:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Mettre à jour le profil admin
+router.put('/profile', adminAuth, async (req, res) => {
+  try {
+    const { AdminUser } = getModels();
+    const { firstName, lastName, email, currentPassword, newPassword } = req.body;
+    
+    const admin = await AdminUser.findById(req.admin._id);
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+
+    // Mettre à jour les champs de base
+    if (firstName) admin.firstName = firstName;
+    if (lastName) admin.lastName = lastName;
+    if (email) admin.email = email;
+
+    // Gérer le changement de mot de passe
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ message: 'Current password is required to change password' });
+      }
+      
+      // Valider la force du nouveau mot de passe
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+      }
+      if (!/[A-Z]/.test(newPassword)) {
+        return res.status(400).json({ message: 'Password must contain at least one uppercase letter' });
+      }
+      if (!/[a-z]/.test(newPassword)) {
+        return res.status(400).json({ message: 'Password must contain at least one lowercase letter' });
+      }
+      if (!/[0-9]/.test(newPassword)) {
+        return res.status(400).json({ message: 'Password must contain at least one number' });
+      }
+      if (!/[^A-Za-z0-9]/.test(newPassword)) {
+        return res.status(400).json({ message: 'Password must contain at least one special character' });
+      }
+      
+      const bcrypt = require('bcryptjs');
+      const adminWithPassword = await AdminUser.findById(req.admin._id).select('+password');
+      const isValidPassword = await bcrypt.compare(currentPassword, adminWithPassword.password);
+      if (!isValidPassword) {
+        return res.status(400).json({ message: 'Current password is incorrect' });
+      }
+      
+      // Le hachage du mot de passe sera fait automatiquement par le pre-save middleware
+      admin.password = newPassword;
+    }
+
+    await admin.save();
+
+    // Retourner les données mises à jour (sans le mot de passe)
+    res.json({
+      _id: admin._id,
+      firstName: admin.firstName,
+      lastName: admin.lastName,
+      email: admin.email,
+      role: admin.role,
+      permissions: admin.permissions,
+      lastLogin: admin.lastLogin
+    });
+  } catch (error) {
+    console.error('Error updating admin profile:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Email already in use' });
+    }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -1389,22 +1460,73 @@ router.get('/clients', async (req, res) => {
  *         description: Seuls les techniciens peuvent créer des clients
  */
 // Créer un nouvel administrateur
-router.post('/admins', async (req, res) => {
+router.post('/admins', adminAuth, async (req, res) => {
   try {
+    // Vérifier que l'utilisateur est admin ou technicien
+    if (!['admin', 'technician'].includes(req.admin.role)) {
+      return res.status(403).json({ message: 'Access denied. Admin or technician role required.' });
+    }
+
     const { AdminUser } = getModels();
+    const { firstName, lastName, email, password, role, isActive, permissions } = req.body;
     
-    const admin = new AdminUser(req.body);
-    await admin.save();
+    // Valider les données requises
+    if (!firstName || !lastName || !email || !password || !role) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    // Valider la force du mot de passe
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    }
+    if (!/[A-Z]/.test(password)) {
+      return res.status(400).json({ message: 'Password must contain at least one uppercase letter' });
+    }
+    if (!/[a-z]/.test(password)) {
+      return res.status(400).json({ message: 'Password must contain at least one lowercase letter' });
+    }
+    if (!/[0-9]/.test(password)) {
+      return res.status(400).json({ message: 'Password must contain at least one number' });
+    }
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      return res.status(400).json({ message: 'Password must contain at least one special character' });
+    }
+
+    // Vérifier que le rôle est valide
+    if (!['admin', 'technician'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role. Must be admin or technician.' });
+    }
+
+    // Créer le nouvel admin
+    const newAdmin = new AdminUser({
+      firstName,
+      lastName,
+      email,
+      password,
+      role,
+      isActive: isActive !== undefined ? isActive : true,
+      permissions: permissions || []
+    });
+
+    await newAdmin.save();
+
+    // Retourner les données (sans le mot de passe)
     res.status(201).json({
-      _id: admin._id,
-      firstName: admin.firstName,
-      lastName: admin.lastName,
-      email: admin.email,
-      role: admin.role,
-      permissions: admin.permissions
+      _id: newAdmin._id,
+      firstName: newAdmin.firstName,
+      lastName: newAdmin.lastName,
+      email: newAdmin.email,
+      role: newAdmin.role,
+      isActive: newAdmin.isActive,
+      permissions: newAdmin.permissions,
+      createdAt: newAdmin.createdAt
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error creating admin:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Email already in use' });
+    }
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
@@ -3155,6 +3277,116 @@ router.get('/quote/html/:quoteId', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).send('Erreur serveur');
+  }
+});
+
+// COUNTER MANAGEMENT ROUTES
+
+// Récupérer les compteurs actuels
+router.get('/counters', adminAuth, async (req, res) => {
+  try {
+    // Vérifier que l'utilisateur est admin ou technicien
+    if (!['admin', 'technician'].includes(req.admin.role)) {
+      return res.status(403).json({ message: 'Access denied. Admin or technician role required.' });
+    }
+
+    const { InvoiceCounter, QuoteCounter } = getModels();
+    
+    let invoiceCounter = await InvoiceCounter.findOne();
+    if (!invoiceCounter) {
+      invoiceCounter = await InvoiceCounter.create({ seq: 1 });
+    }
+
+    let quoteCounter = await QuoteCounter.findOne();
+    if (!quoteCounter) {
+      quoteCounter = await QuoteCounter.create({ seq: 1 });
+    }
+
+    res.json({
+      invoiceCounter: invoiceCounter.seq,
+      quoteCounter: quoteCounter.seq
+    });
+  } catch (error) {
+    console.error('Error fetching counters:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Mettre à jour le compteur d'invoices
+router.put('/counters/invoices', adminAuth, async (req, res) => {
+  try {
+    // Vérifier que l'utilisateur est admin ou technicien
+    if (!['admin', 'technician'].includes(req.admin.role)) {
+      return res.status(403).json({ message: 'Access denied. Admin or technician role required.' });
+    }
+
+    const { InvoiceCounter } = getModels();
+    const { action, value } = req.body;
+
+    let counter = await InvoiceCounter.findOne();
+    if (!counter) {
+      counter = await InvoiceCounter.create({ seq: 1 });
+    }
+
+    if (action === 'increment') {
+      counter.seq += 1;
+    } else if (action === 'reset') {
+      counter.seq = value || 1;
+    } else if (action === 'set' && value !== undefined) {
+      counter.seq = Math.max(1, parseInt(value));
+    } else {
+      return res.status(400).json({ message: 'Invalid action or missing value' });
+    }
+
+    await counter.save();
+
+    res.json({
+      success: true,
+      invoiceCounter: counter.seq,
+      message: `Invoice counter ${action === 'increment' ? 'incremented' : action === 'reset' ? 'reset' : 'updated'} successfully`
+    });
+  } catch (error) {
+    console.error('Error updating invoice counter:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Mettre à jour le compteur de quotes
+router.put('/counters/quotes', adminAuth, async (req, res) => {
+  try {
+    // Vérifier que l'utilisateur est admin ou technicien
+    if (!['admin', 'technician'].includes(req.admin.role)) {
+      return res.status(403).json({ message: 'Access denied. Admin or technician role required.' });
+    }
+
+    const { QuoteCounter } = getModels();
+    const { action, value } = req.body;
+
+    let counter = await QuoteCounter.findOne();
+    if (!counter) {
+      counter = await QuoteCounter.create({ seq: 1 });
+    }
+
+    if (action === 'increment') {
+      counter.seq += 1;
+    } else if (action === 'reset') {
+      counter.seq = value || 1;
+    } else if (action === 'set' && value !== undefined) {
+      counter.seq = Math.max(1, parseInt(value));
+    } else {
+      return res.status(400).json({ message: 'Invalid action or missing value' });
+    }
+
+    await counter.save();
+
+    res.json({
+      success: true,
+      quoteCounter: counter.seq,
+      message: `Quote counter ${action === 'increment' ? 'incremented' : action === 'reset' ? 'reset' : 'updated'} successfully`
+    });
+  } catch (error) {
+    console.error('Error updating quote counter:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
