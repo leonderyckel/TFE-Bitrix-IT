@@ -1530,6 +1530,108 @@ router.post('/admins', adminAuth, async (req, res) => {
   }
 });
 
+// Modifier un administrateur
+router.put('/admins/:id', adminAuth, async (req, res) => {
+  try {
+    // Vérifier que l'utilisateur est admin ou technicien
+    if (!['admin', 'technician'].includes(req.admin.role)) {
+      return res.status(403).json({ message: 'Access denied. Admin or technician role required.' });
+    }
+
+    const { AdminUser } = getModels();
+    const { firstName, lastName, email, password, role, isActive, permissions } = req.body;
+    
+    // Valider les données requises
+    if (!firstName || !lastName || !email || !role) {
+      return res.status(400).json({ message: 'First name, last name, email and role are required' });
+    }
+
+    // Vérifier que le rôle est valide
+    if (!['admin', 'technician'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role. Must be admin or technician.' });
+    }
+
+    // Construire l'objet de mise à jour
+    const updateData = {
+      firstName,
+      lastName,
+      email,
+      role,
+      isActive: isActive !== undefined ? isActive : true,
+      permissions: permissions || []
+    };
+
+    // Si un mot de passe est fourni, le valider et l'ajouter
+    if (password && password.trim() !== '') {
+      // Valider la force du mot de passe
+      if (password.length < 8) {
+        return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+      }
+      if (!/[A-Z]/.test(password)) {
+        return res.status(400).json({ message: 'Password must contain at least one uppercase letter' });
+      }
+      if (!/[a-z]/.test(password)) {
+        return res.status(400).json({ message: 'Password must contain at least one lowercase letter' });
+      }
+      if (!/[0-9]/.test(password)) {
+        return res.status(400).json({ message: 'Password must contain at least one number' });
+      }
+      if (!/[^A-Za-z0-9]/.test(password)) {
+        return res.status(400).json({ message: 'Password must contain at least one special character' });
+      }
+      
+      updateData.password = password;
+    }
+
+    // Mettre à jour l'admin
+    const updatedAdmin = await AdminUser.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!updatedAdmin) {
+      return res.status(404).json({ message: 'Admin user not found' });
+    }
+
+    res.json(updatedAdmin);
+  } catch (error) {
+    console.error('Error updating admin:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Email already in use' });
+    }
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Supprimer un administrateur
+router.delete('/admins/:id', adminAuth, async (req, res) => {
+  try {
+    // Vérifier que l'utilisateur est admin ou technicien
+    if (!['admin', 'technician'].includes(req.admin.role)) {
+      return res.status(403).json({ message: 'Access denied. Admin or technician role required.' });
+    }
+
+    // Empêcher l'utilisateur de se supprimer lui-même
+    if (req.admin._id.toString() === req.params.id) {
+      return res.status(400).json({ message: 'You cannot delete your own account' });
+    }
+
+    const { AdminUser } = getModels();
+    
+    const deletedAdmin = await AdminUser.findByIdAndDelete(req.params.id);
+
+    if (!deletedAdmin) {
+      return res.status(404).json({ message: 'Admin user not found' });
+    }
+
+    res.json({ message: 'Admin user deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting admin:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Créer un nouveau ticket pour un client spécifique (par l'admin)
 router.post('/tickets', async (req, res) => {
   try {

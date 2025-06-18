@@ -29,7 +29,10 @@ const adminValidationSchema = yup.object({
     .matches(/[a-z]/, 'Password must contain at least one lowercase letter')
     .matches(/[0-9]/, 'Password must contain at least one number')
     .matches(/[^A-Za-z0-9]/, 'Password must contain at least one special character')
-    .required('Password is required'),
+    .when('isEditing', {
+      is: false,
+      then: (schema) => schema.required('Password is required')
+    }),
   role: yup.string().required('Role is required')
 });
 
@@ -41,13 +44,16 @@ function AdminSettings() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [editingAdmin, setEditingAdmin] = useState(null);
+  const [adminToDelete, setAdminToDelete] = useState(null);
   const [counters, setCounters] = useState({
     invoiceCounter: 0,
     quoteCounter: 0
   });
   const navigate = useNavigate();
 
-  // Formik pour la création d'admin
+  // Formik pour la création/modification d'admin
   const formik = useFormik({
     initialValues: {
       firstName: '',
@@ -55,29 +61,55 @@ function AdminSettings() {
       email: '',
       password: '',
       role: 'technician',
-      isActive: true
+      isActive: true,
+      isEditing: false
     },
     validationSchema: adminValidationSchema,
     onSubmit: async (values, { resetForm }) => {
       try {
         setLoading(true);
-        const response = await axios.post(
-          `${API_URL}/admin/admins`,
-          values,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        );
+        const submitData = { ...values };
+        delete submitData.isEditing;
         
-        setAdmins(prev => [...prev, response.data]);
-        setSuccess('Admin user created successfully!');
+        // Si on édite et qu'il n'y a pas de password, on l'enlève
+        if (editingAdmin && !submitData.password) {
+          delete submitData.password;
+        }
+        
+        let response;
+        if (editingAdmin) {
+          response = await axios.put(
+            `${API_URL}/admin/admins/${editingAdmin._id}`,
+            submitData,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`
+              }
+            }
+          );
+          setAdmins(prev => prev.map(admin => 
+            admin._id === editingAdmin._id ? response.data : admin
+          ));
+          setSuccess('Admin user updated successfully!');
+        } else {
+          response = await axios.post(
+            `${API_URL}/admin/admins`,
+            submitData,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`
+              }
+            }
+          );
+          setAdmins(prev => [...prev, response.data]);
+          setSuccess('Admin user created successfully!');
+        }
+        
         handleCloseDialog();
         resetForm();
       } catch (error) {
-        console.error('Error creating admin user:', error);
-        setError('Failed to create admin user. ' + (error.response?.data?.message || error.message));
+        console.error('Error saving admin user:', error);
+        setError('Failed to save admin user. ' + (error.response?.data?.message || error.message));
       } finally {
         setLoading(false);
       }
@@ -153,14 +185,66 @@ function AdminSettings() {
   };
 
   const handleOpenDialog = () => {
+    setEditingAdmin(null);
+    setOpenDialog(true);
+    setError(null);
+    setSuccess(null);
+    formik.resetForm();
+  };
+
+  const handleEditAdmin = (admin) => {
+    setEditingAdmin(admin);
+    formik.setValues({
+      firstName: admin.firstName,
+      lastName: admin.lastName,
+      email: admin.email,
+      password: '',
+      role: admin.role,
+      isActive: admin.isActive,
+      isEditing: true
+    });
     setOpenDialog(true);
     setError(null);
     setSuccess(null);
   };
 
+  const handleDeleteAdmin = (admin) => {
+    setAdminToDelete(admin);
+    setOpenDeleteDialog(true);
+  };
+
+  const confirmDeleteAdmin = async () => {
+    if (!adminToDelete) return;
+    
+    try {
+      setLoading(true);
+      await axios.delete(`${API_URL}/admin/admins/${adminToDelete._id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      setAdmins(prev => prev.filter(admin => admin._id !== adminToDelete._id));
+      setSuccess('Admin user deleted successfully!');
+      setOpenDeleteDialog(false);
+      setAdminToDelete(null);
+    } catch (error) {
+      console.error('Error deleting admin user:', error);
+      setError('Failed to delete admin user. ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCloseDialog = () => {
     setOpenDialog(false);
+    setEditingAdmin(null);
     formik.resetForm();
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setOpenDeleteDialog(false);
+    setAdminToDelete(null);
   };
 
   const getRoleChip = (role) => {
@@ -208,6 +292,74 @@ function AdminSettings() {
         )}
 
         <Grid container spacing={3}>
+          {/* Admin Users Management Section */}
+          <Grid item xs={12}>
+            <Paper sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h5">
+                  Admin Users & Technicians
+                </Typography>
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  startIcon={<PersonAddIcon />}
+                  onClick={handleOpenDialog}
+                >
+                  Add New User
+                </Button>
+              </Box>
+
+              {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                  <CircularProgress />
+                </Box>
+              ) : (
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Name</TableCell>
+                        <TableCell>Email</TableCell>
+                        <TableCell>Role</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Last Login</TableCell>
+                        <TableCell>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {admins.map((admin) => (
+                        <TableRow key={admin._id} hover>
+                          <TableCell>{admin.firstName} {admin.lastName}</TableCell>
+                          <TableCell>{admin.email}</TableCell>
+                          <TableCell>{getRoleChip(admin.role)}</TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={admin.isActive ? "Active" : "Inactive"} 
+                              color={admin.isActive ? "success" : "default"} 
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {admin.lastLogin ? new Date(admin.lastLogin).toLocaleString() : 'Never'}
+                          </TableCell>
+                          <TableCell>
+                            <IconButton color="primary" title="Edit User" onClick={() => handleEditAdmin(admin)}>
+                              <EditIcon />
+                            </IconButton>
+                            {admin._id !== user?._id && (
+                              <IconButton color="error" title="Delete User" onClick={() => handleDeleteAdmin(admin)}>
+                                <DeleteIcon />
+                              </IconButton>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Paper>
+          </Grid>
+
           {/* Counter Management Section */}
           <Grid item xs={12}>
             <Paper sx={{ p: 2 }}>
@@ -316,81 +468,13 @@ function AdminSettings() {
               </Grid>
             </Paper>
           </Grid>
-
-          {/* Admin Users Management Section */}
-          <Grid item xs={12}>
-            <Paper sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h5">
-                  Admin Users & Technicians
-                </Typography>
-                <Button 
-                  variant="contained" 
-                  color="primary" 
-                  startIcon={<PersonAddIcon />}
-                  onClick={handleOpenDialog}
-                >
-                  Add New User
-                </Button>
-              </Box>
-
-              {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                  <CircularProgress />
-                </Box>
-              ) : (
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Name</TableCell>
-                        <TableCell>Email</TableCell>
-                        <TableCell>Role</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Last Login</TableCell>
-                        <TableCell>Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {admins.map((admin) => (
-                        <TableRow key={admin._id} hover>
-                          <TableCell>{admin.firstName} {admin.lastName}</TableCell>
-                          <TableCell>{admin.email}</TableCell>
-                          <TableCell>{getRoleChip(admin.role)}</TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={admin.isActive ? "Active" : "Inactive"} 
-                              color={admin.isActive ? "success" : "default"} 
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {admin.lastLogin ? new Date(admin.lastLogin).toLocaleString() : 'Never'}
-                          </TableCell>
-                          <TableCell>
-                            <IconButton color="primary" title="Edit User">
-                              <EditIcon />
-                            </IconButton>
-                            {admin._id !== user?._id && (
-                              <IconButton color="error" title="Delete User">
-                                <DeleteIcon />
-                              </IconButton>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </Paper>
-          </Grid>
         </Grid>
       </Paper>
 
       {/* Dialog for adding new admin */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <form onSubmit={formik.handleSubmit}>
-          <DialogTitle>Add New Admin/Technician</DialogTitle>
+          <DialogTitle>{editingAdmin ? 'Edit Admin/Technician' : 'Add New Admin/Technician'}</DialogTitle>
           <DialogContent>
             <Grid container spacing={2} sx={{ mt: 1 }}>
               <Grid item xs={12} md={6}>
@@ -430,7 +514,7 @@ function AdminSettings() {
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Password"
+                  label={editingAdmin ? "Password (leave empty to keep current)" : "Password"}
                   name="password"
                   type="password"
                   value={formik.values.password}
@@ -480,10 +564,28 @@ function AdminSettings() {
               color="primary"
               disabled={formik.isSubmitting || !formik.isValid}
             >
-              {formik.isSubmitting ? <CircularProgress size={24} /> : 'Add User'}
+              {formik.isSubmitting ? <CircularProgress size={24} /> : (editingAdmin ? 'Update User' : 'Add User')}
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      {/* Dialog for deleting admin */}
+      <Dialog open={openDeleteDialog} onClose={handleCloseDeleteDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete this admin user? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={confirmDeleteAdmin} color="error" autoFocus>
+            Delete
+          </Button>
+        </DialogActions>
       </Dialog>
     </Container>
   );
