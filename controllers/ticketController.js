@@ -93,7 +93,7 @@ exports.getTickets = async (req, res) => {
 // Get single ticket
 exports.getTicket = async (req, res) => {
   try {
-    const { Ticket, AdminUser, User } = getModels(); // Need User model too for company check
+    const { Ticket, AdminUser, User, Quote } = getModels(); // Need User model too for company check
     
     // Fetch the ticket and populate the client FULLY (including company and isCompanyBoss)
     const ticket = await Ticket.findById(req.params.id)
@@ -155,6 +155,21 @@ exports.getTicket = async (req, res) => {
       }
     } else {
        ticketObject.technician = null; 
+    }
+
+    // Fetch quote information if quote has been saved for this ticket
+    if (ticketObject.quote && ticketObject.quote.saved) {
+      try {
+        const quote = await Quote.findOne({ ticket: ticketObject._id }).select('accepted paid').lean();
+        if (quote) {
+          ticketObject.quoteDetails = {
+            accepted: quote.accepted,
+            paid: quote.paid
+          };
+        }
+      } catch (quoteError) {
+        console.error('Error fetching quote details:', quoteError);
+      }
     }
 
     res.json(ticketObject); 

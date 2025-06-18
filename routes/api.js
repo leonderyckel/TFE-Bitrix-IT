@@ -364,6 +364,92 @@ router.get('/billing/invoices', auth, async (req, res) => {
   }
 });
 
+// Route pour récupérer les devis sauvegardés du client connecté
+router.get('/billing/quotes', auth, async (req, res) => {
+  try {
+    const { Ticket, Quote } = getModels();
+    // On récupère les devis dont le ticket appartient au client connecté et qui sont marqués comme saved
+    const tickets = await Ticket.find({ client: req.user.id, 'quote.saved': true }).select('_id');
+    const ticketIds = tickets.map(t => t._id);
+    const quotes = await Quote.find({ ticket: { $in: ticketIds } }).sort({ date: -1 });
+    res.json(quotes);
+  } catch (err) {
+    res.status(500).json({ message: 'Error loading quotes.' });
+  }
+});
+
+// Route pour afficher le HTML d'un devis pour le client connecté
+router.get('/quote/html/:id', auth, async (req, res) => {
+  try {
+    const { Quote, Ticket, User } = getModels();
+    const quote = await Quote.findById(req.params.id);
+    if (!quote) return res.status(404).json({ message: 'Quote not found.' });
+
+    // Vérifie que le devis appartient bien au client connecté
+    if (quote.client.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied.' });
+    }
+
+    const ticket = await Ticket.findById(quote.ticket);
+    const user = await User.findById(quote.client);
+
+    // Lis le template HTML
+    const templatePath = path.join(__dirname, '../templates/invoiceTemplate.html');
+    const templateSource = fs.readFileSync(templatePath, 'utf8');
+    const template = Handlebars.compile(templateSource);
+
+    // Prépare les données comme dans la route admin
+    const data = {
+      ...quote.toObject(),
+      clientName: user.firstName + ' ' + user.lastName,
+      clientAddress: user.address,
+      clientVAT: user.vat,
+      reference: quote.reference || (ticket ? ticket.title : ''),
+      isQuote: true // Flag pour différencier du template facture
+    };
+
+    const html = template(data);
+    res.send(html);
+  } catch (err) {
+    res.status(500).json({ message: 'Error generating quote HTML.' });
+  }
+});
+
+// Route pour marquer un devis comme accepté
+router.patch('/quote/mark-accepted/:id', auth, async (req, res) => {
+  try {
+    const { Quote } = getModels();
+    const quote = await Quote.findById(req.params.id);
+    if (!quote) return res.status(404).json({ message: 'Quote not found.' });
+    if (quote.client.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied.' });
+    }
+    quote.accepted = true;
+    await quote.save();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: 'Error updating quote status.' });
+  }
+});
+
+// Route pour marquer un devis comme accepté et payé
+router.patch('/quote/mark-accepted-paid/:id', auth, async (req, res) => {
+  try {
+    const { Quote } = getModels();
+    const quote = await Quote.findById(req.params.id);
+    if (!quote) return res.status(404).json({ message: 'Quote not found.' });
+    if (quote.client.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied.' });
+    }
+    quote.accepted = true;
+    quote.paid = true;
+    await quote.save();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: 'Error updating quote status.' });
+  }
+});
+
 router.patch('/invoice/mark-paid/:id', auth, async (req, res) => {
   try {
     const { Invoice } = getModels();

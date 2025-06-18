@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const invoiceItemSchema = new mongoose.Schema({
+const quoteItemSchema = new mongoose.Schema({
   description: String,
   subDescription: String,
   quantity: Number,
@@ -8,8 +8,8 @@ const invoiceItemSchema = new mongoose.Schema({
   total: Number
 }, { _id: false });
 
-const invoiceSchema = new mongoose.Schema({
-  invoiceNumber: { type: String, required: true, unique: true },
+const quoteSchema = new mongoose.Schema({
+  quoteNumber: { type: String, required: true, unique: true },
   ticket: { type: mongoose.Schema.Types.ObjectId, ref: 'Ticket', required: true },
   client: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   companyName: String,
@@ -23,7 +23,7 @@ const invoiceSchema = new mongoose.Schema({
   reference: String,
   salesRep: String,
   discount: Number,
-  items: [invoiceItemSchema],
+  items: [quoteItemSchema],
   totalDiscount: Number,
   totalExclusive: Number,
   totalVAT: Number,
@@ -32,27 +32,29 @@ const invoiceSchema = new mongoose.Schema({
   notes: [String],
   bankDetails: String,
   pdfUrl: String,
+  accepted: { type: Boolean, default: false },
   paid: { type: Boolean, default: false },
   isLocked: { type: Boolean, default: false },
+  validUntil: { type: Date }, // Date d'expiration du devis
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
 
-invoiceSchema.pre('save', function(next) {
+quoteSchema.pre('save', function(next) {
   // Permettre toutes les modifications pour les nouveaux documents
   if (this.isNew) {
     this.updatedAt = new Date();
     return next();
   }
   
-  // Pour les documents existants, vérifier si la facture est verrouillée
+  // Pour les documents existants, vérifier si le devis est verrouillé
   if (this.isLocked) {
     const modifiedPaths = this.modifiedPaths();
-    const allowedModifications = ['paid', 'updatedAt'];
+    const allowedModifications = ['accepted', 'paid', 'updatedAt'];
     const unauthorizedModifications = modifiedPaths.filter(path => !allowedModifications.includes(path));
     
     if (unauthorizedModifications.length > 0) {
-      const error = new Error(`Invoice is locked and cannot be modified. Attempted to modify: ${unauthorizedModifications.join(', ')}`);
+      const error = new Error(`Quote is locked and cannot be modified. Attempted to modify: ${unauthorizedModifications.join(', ')}`);
       error.name = 'ValidationError';
       return next(error);
     }
@@ -62,9 +64,9 @@ invoiceSchema.pre('save', function(next) {
   next();
 });
 
-invoiceSchema.methods.lock = function() {
+quoteSchema.methods.lock = function() {
   this.isLocked = true;
   return this.save();
 };
 
-module.exports = invoiceSchema; 
+module.exports = quoteSchema; 

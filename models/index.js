@@ -7,6 +7,8 @@ const companySensitiveDataSchemaDefinition = require('./CompanySensitiveData');
 const NotificationSchemaDefinition = require('./Notification');
 const InvoiceCounterSchema = require('./InvoiceCounter');
 const InvoiceSchema = require('./Invoice');
+const QuoteCounterSchema = require('./QuoteCounter');
+const QuoteSchema = require('./Quote');
 
 let models = null;
 
@@ -30,6 +32,10 @@ const initializeModels = async () => {
     const adminUserMongooseSchema = new mongoose.Schema(adminUserSchema);
     const companySensitiveDataMongooseSchema = new mongoose.Schema(companySensitiveDataSchemaDefinition);
     const notificationMongooseSchema = new mongoose.Schema(NotificationSchemaDefinition, { timestamps: true });
+    const invoiceCounterMongooseSchema = new mongoose.Schema(InvoiceCounterSchema.schema);
+    const invoiceMongooseSchema = new mongoose.Schema(InvoiceSchema);
+    const quoteCounterMongooseSchema = new mongoose.Schema(QuoteCounterSchema.schema);
+    const quoteMongooseSchema = new mongoose.Schema(QuoteSchema);
 
     // Ajout des hooks aux schémas
     ticketMongooseSchema.pre('save', function(next) {
@@ -41,8 +47,10 @@ const initializeModels = async () => {
     const User = mainConnection.model('User', userMongooseSchema);
     const Ticket = mainConnection.model('Ticket', ticketMongooseSchema);
     const Notification = mainConnection.model('Notification', notificationMongooseSchema);
-    const InvoiceCounter = mainConnection.model('InvoiceCounter', InvoiceCounterSchema.schema);
-    const Invoice = mainConnection.model('Invoice', InvoiceSchema);
+    const InvoiceCounter = mainConnection.model('InvoiceCounter', invoiceCounterMongooseSchema);
+    const Invoice = mainConnection.model('Invoice', invoiceMongooseSchema);
+    const QuoteCounter = mainConnection.model('QuoteCounter', quoteCounterMongooseSchema);
+    const Quote = mainConnection.model('Quote', quoteMongooseSchema);
 
     // Initialisation des modèles admin
     const AdminUser = adminConnection.model('AdminUser', adminUserMongooseSchema);
@@ -56,6 +64,8 @@ const initializeModels = async () => {
       Notification,
       InvoiceCounter,
       Invoice,
+      QuoteCounter,
+      Quote,
       mainConnection,
       adminConnection
     };

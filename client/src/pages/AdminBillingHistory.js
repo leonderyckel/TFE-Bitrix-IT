@@ -11,7 +11,9 @@ import {
   Paper,
   Button,
   CircularProgress,
-  Dialog
+  Dialog,
+  Tabs,
+  Tab
 } from '@mui/material';
 import axios from 'axios';
 import API_URL from '../config/api';
@@ -19,43 +21,58 @@ import html2pdf from 'html2pdf.js';
 
 const AdminBillingHistory = () => {
   const [invoices, setInvoices] = useState([]);
+  const [quotes, setQuotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showInvoice, setShowInvoice] = useState(false);
-  const [invoiceHtml, setInvoiceHtml] = useState('');
-  const [loadingInvoice, setLoadingInvoice] = useState(false);
+  const [showDocument, setShowDocument] = useState(false);
+  const [documentHtml, setDocumentHtml] = useState('');
+  const [loadingDocument, setLoadingDocument] = useState(false);
+  const [currentTab, setCurrentTab] = useState(0);
 
   useEffect(() => {
-    const fetchInvoices = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const res = await axios.get(`${API_URL}/admin/invoices`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setInvoices(res.data);
+        
+        // Récupérer les factures et les devis en parallèle
+        const [invoicesRes, quotesRes] = await Promise.all([
+          axios.get(`${API_URL}/admin/invoices`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          axios.get(`${API_URL}/admin/quotes`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        ]);
+        
+        setInvoices(invoicesRes.data);
+        setQuotes(quotesRes.data);
       } catch (err) {
-        setError('Error loading invoices.');
+        setError('Error loading billing data.');
       } finally {
         setLoading(false);
       }
     };
-    fetchInvoices();
+    fetchData();
   }, []);
 
-  const handleShowInvoice = async (invoiceId) => {
-    setLoadingInvoice(true);
-    setShowInvoice(true);
+  const handleShowDocument = async (documentId, documentType) => {
+    setLoadingDocument(true);
+    setShowDocument(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${API_URL}/admin/invoice/html/${invoiceId}`, {
+      const endpoint = documentType === 'invoice' ? 
+        `/admin/invoice/html/${documentId}` : 
+        `/admin/quote/html/${documentId}`;
+      
+      const res = await axios.get(`${API_URL}${endpoint}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setInvoiceHtml(res.data.html || res.data);
+      setDocumentHtml(res.data.html || res.data);
     } catch (err) {
-      setInvoiceHtml('<div style="padding:40px;color:red;">Error loading invoice.</div>');
+      setDocumentHtml(`<div style="padding:40px;color:red;">Error loading ${documentType}.</div>`);
     } finally {
-      setLoadingInvoice(false);
+      setLoadingDocument(false);
     }
   };
 
@@ -77,10 +94,14 @@ const AdminBillingHistory = () => {
     });
   };
 
-  const handleDownloadInvoice = async (invoiceId) => {
+  const handleDownloadDocument = async (documentId, documentType) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${API_URL}/admin/invoice/html/${invoiceId}`, {
+      const endpoint = documentType === 'invoice' ? 
+        `/admin/invoice/html/${documentId}` : 
+        `/admin/quote/html/${documentId}`;
+      
+      const res = await axios.get(`${API_URL}${endpoint}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const html = res.data.html || res.data;
@@ -94,78 +115,108 @@ const AdminBillingHistory = () => {
         img.src = base64Image;
       }
 
+      const filename = documentType === 'invoice' ? 'invoice.pdf' : 'quote.pdf';
       html2pdf().from(a4).set({
         margin: 0,
-        filename: 'invoice.pdf',
+        filename: filename,
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       }).save();
     } catch (err) {
-      console.error('Erreur lors de la génération du PDF:', err);
-      alert('Error generating PDF.');
+      console.error(`Erreur lors de la génération du PDF ${documentType}:`, err);
     }
   };
+
+  const handleTabChange = (event, newValue) => {
+    setCurrentTab(newValue);
+  };
+
+  const renderTable = (data, documentType) => (
+    <TableContainer component={Paper}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell>Number</TableCell>
+            <TableCell>Client</TableCell>
+            <TableCell>Date</TableCell>
+            <TableCell>{documentType === 'invoice' ? 'Payment' : 'Status'}</TableCell>
+            <TableCell>Action</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {data.map((document) => (
+            <TableRow key={document._id}>
+              <TableCell>
+                {documentType === 'invoice' ? document.invoiceNumber : document.quoteNumber}
+              </TableCell>
+              <TableCell>{document.clientName || 'N/A'}</TableCell>
+              <TableCell>{document.date}</TableCell>
+              <TableCell>
+                {documentType === 'invoice' ? (
+                  document.paid ? (
+                    <span style={{ color: 'green', fontWeight: 600 }}>Paid</span>
+                  ) : (
+                    <span style={{ color: 'red', fontWeight: 600 }}>Not paid</span>
+                  )
+                ) : (
+                  document.accepted ? (
+                    <span style={{ color: 'green', fontWeight: 600 }}>Accepted</span>
+                  ) : (
+                    <span style={{ color: 'orange', fontWeight: 600 }}>Pending</span>
+                  )
+                )}
+              </TableCell>
+              <TableCell>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="small"
+                  onClick={() => handleShowDocument(document._id, documentType)}
+                  sx={{ mr: 1 }}
+                >
+                  View
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  size="small"
+                  onClick={() => handleDownloadDocument(document._id, documentType)}
+                >
+                  Download
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
 
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>
         Billing History
       </Typography>
+      
       {loading ? (
         <CircularProgress />
       ) : error ? (
         <Typography color="error">{error}</Typography>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Number</TableCell>
-                <TableCell>Client</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Payment</TableCell>
-                <TableCell>Action</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {invoices.map((invoice) => (
-                <TableRow key={invoice._id}>
-                  <TableCell>{invoice.invoiceNumber}</TableCell>
-                  <TableCell>{invoice.clientName || 'N/A'}</TableCell>
-                  <TableCell>{invoice.date}</TableCell>
-                  <TableCell>
-                    {invoice.paid ? (
-                      <span style={{ color: 'green', fontWeight: 600 }}>Paid</span>
-                    ) : (
-                      <span style={{ color: 'red', fontWeight: 600 }}>Not paid</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      size="small"
-                      onClick={() => handleShowInvoice(invoice._id)}
-                      sx={{ mr: 1 }}
-                    >
-                      View
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="secondary"
-                      size="small"
-                      onClick={() => handleDownloadInvoice(invoice._id)}
-                    >
-                      Download
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+            <Tabs value={currentTab} onChange={handleTabChange}>
+              <Tab label={`Invoices (${invoices.length})`} />
+              <Tab label={`Quotes (${quotes.length})`} />
+            </Tabs>
+          </Box>
+          
+          {currentTab === 0 && renderTable(invoices, 'invoice')}
+          {currentTab === 1 && renderTable(quotes, 'quote')}
+        </>
       )}
-      <Dialog open={showInvoice} onClose={() => setShowInvoice(false)} maxWidth="lg" fullWidth
+      
+      <Dialog open={showDocument} onClose={() => setShowDocument(false)} maxWidth="lg" fullWidth
         PaperProps={{
           style: {
             background: '#e5e5e5',
@@ -177,12 +228,12 @@ const AdminBillingHistory = () => {
           }
         }}
       >
-        {loadingInvoice ? (
+        {loadingDocument ? (
           <div style={{ padding: 40, textAlign: 'center' }}><CircularProgress /></div>
         ) : (
           <div
             style={{ minHeight: 600, background: '#e5e5e5' }}
-            dangerouslySetInnerHTML={{ __html: invoiceHtml }}
+            dangerouslySetInnerHTML={{ __html: documentHtml }}
           />
         )}
       </Dialog>

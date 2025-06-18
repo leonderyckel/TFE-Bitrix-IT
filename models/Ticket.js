@@ -105,6 +105,18 @@ const ticketSchema = new mongoose.Schema({
       default: false
     }
   },
+  quote: {
+    generated: {
+      type: Boolean,
+      default: false
+    },
+    amount: Number,
+    generatedAt: Date,
+    saved: {
+      type: Boolean,
+      default: false
+    }
+  },
   createdAt: {
     type: Date,
     default: Date.now

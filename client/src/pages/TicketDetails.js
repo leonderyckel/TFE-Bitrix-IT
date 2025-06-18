@@ -159,7 +159,9 @@ function TicketDetails() {
       const statusMap = {
         'logged': 'Logged',
         'assigned': 'Assigned',
-        'quote-sent': 'Quote Sent',
+        'quote-sent': ticket.quoteDetails && ticket.quoteDetails.accepted && ticket.quoteDetails.paid 
+          ? 'Quote Accepted & Paid by Client' 
+          : 'Quote Sent',
         'hardware-ordered': 'Hardware Ordered',
         'scheduled': 'Scheduled', 
         'closed': 'Closed'
@@ -192,7 +194,9 @@ function TicketDetails() {
       const statusMap = {
         'logged': 'Logged',
         'assigned': 'Assigned',
-        'quote-sent': 'Quote Sent',
+        'quote-sent': ticket.quoteDetails && ticket.quoteDetails.accepted && ticket.quoteDetails.paid 
+          ? 'Quote Accepted & Paid by Client' 
+          : 'Quote Sent',
         'hardware-ordered': 'Hardware Ordered',
         'scheduled': 'Scheduled',
         'closed': 'Closed'
@@ -505,8 +509,18 @@ function TicketDetails() {
                       </ListItemAvatar>
                       <ListItemText
                         primary={
-                          <Typography variant="body2" fontWeight="medium">
-                             {progressStatusLabels[progress.status] || progress.status} 
+                          <Typography 
+                            variant="body2" 
+                            fontWeight="medium"
+                            sx={{
+                              color: (progress.status === 'quote-sent' && 
+                                      displayTicketData.quoteDetails?.accepted && 
+                                      displayTicketData.quoteDetails?.paid) 
+                                ? 'success.main' 
+                                : 'inherit'
+                            }}
+                          >
+                             {getStepDescription(progress.status, displayTicketData)} 
                           </Typography>
                         }
                         secondary={

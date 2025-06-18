@@ -12,7 +12,9 @@ import {
   Button,
   CircularProgress,
   Dialog,
-  TextField
+  TextField,
+  Tabs,
+  Tab
 } from '@mui/material';
 import axios from 'axios';
 import API_URL from '../config/api';
@@ -21,6 +23,7 @@ import CloseIcon from '@mui/icons-material/Close';
 
 const AdminBilling = () => {
   const [tickets, setTickets] = useState([]);
+  const [quoteTickets, setQuoteTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showInvoice, setShowInvoice] = useState(false);
@@ -28,18 +31,31 @@ const AdminBilling = () => {
   const [loadingInvoice, setLoadingInvoice] = useState(false);
   const [invoiceData, setInvoiceData] = useState(null);
   const [currentTicketId, setCurrentTicketId] = useState(null);
+  const [isInvoiceLocked, setIsInvoiceLocked] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [currentTab, setCurrentTab] = useState(0);
+  const [currentDocumentType, setCurrentDocumentType] = useState('invoice'); // 'invoice' ou 'quote'
 
   useEffect(() => {
     const fetchClosedTickets = async () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const res = await axios.get(`${API_URL}/admin/billing/closed-tickets`, {
+        
+        // Récupérer les tickets fermés pour les factures
+        const resTickets = await axios.get(`${API_URL}/admin/billing/closed-tickets`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setTickets(res.data);
+        setTickets(resTickets.data);
+        
+        // Récupérer les tickets quote-sent pour les devis
+        const resQuotes = await axios.get(`${API_URL}/admin/billing/quote-sent-tickets`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setQuoteTickets(resQuotes.data);
+        
       } catch (err) {
-        setError('Error loading closed tickets.');
+        setError('Error loading tickets.');
       } finally {
         setLoading(false);
       }
@@ -47,24 +63,46 @@ const AdminBilling = () => {
     fetchClosedTickets();
   }, []);
 
-  const handleShowInvoice = async (ticketId) => {
+  const handleShowInvoice = async (ticketId, documentType = 'invoice') => {
     setLoadingInvoice(true);
     setShowInvoice(true);
     setCurrentTicketId(ticketId);
+    setCurrentDocumentType(documentType);
+    setIsInvoiceLocked(false);
+    
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${API_URL}/admin/invoice/preview/${ticketId}`, {
+      const endpoint = documentType === 'quote' ? 'quote' : 'invoice';
+      
+      // Vérifier d'abord si une facture/devis existe déjà et si elle est verrouillée
+      const checkRes = await axios.get(`${API_URL}/admin/${endpoint}/check/${ticketId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.data && typeof res.data === 'object' && res.data.html && res.data.data) {
-        setInvoiceHtml(res.data.html);
-        setInvoiceData(res.data.data);
+      
+      if (checkRes.data.exists && checkRes.data.isLocked) {
+        setIsInvoiceLocked(true);
+        // Si la facture/devis est verrouillé, charger le document existant
+        const documentId = documentType === 'quote' ? checkRes.data.quoteId : checkRes.data.invoiceId;
+        const docRes = await axios.get(`${API_URL}/admin/${endpoint}/html/${documentId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setInvoiceHtml(docRes.data.html || docRes.data);
+        setInvoiceData(null); // Pas d'édition possible
       } else {
-        setInvoiceHtml(res.data.html || res.data);
-        setInvoiceData(null);
+        // Document non verrouillé ou n'existe pas, charger le preview éditable
+        const res = await axios.get(`${API_URL}/admin/${endpoint}/preview/${ticketId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data && typeof res.data === 'object' && res.data.html && res.data.data) {
+          setInvoiceHtml(res.data.html);
+          setInvoiceData(res.data.data);
+        } else {
+          setInvoiceHtml(res.data.html || res.data);
+          setInvoiceData(null);
+        }
       }
     } catch (err) {
-      setInvoiceHtml('<div style="padding:40px;color:red;">Error loading invoice.</div>');
+      setInvoiceHtml(`<div style="padding:40px;color:red;">Error loading ${documentType}.</div>`);
       setInvoiceData(null);
     } finally {
       setLoadingInvoice(false);
@@ -73,22 +111,36 @@ const AdminBilling = () => {
 
   const handleSaveInvoice = async () => {
     if (!invoiceData) {
-      alert('Cannot save: missing invoice data.');
-      return;
+      return; // Silently do nothing if no invoice data
+    }
+    if (isInvoiceLocked) {
+      return; // Silently do nothing if locked
     }
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API_URL}/admin/invoice`, invoiceData, {
+      const endpoint = currentDocumentType === 'quote' ? 'quote' : 'invoice';
+      
+      await axios.post(`${API_URL}/admin/${endpoint}`, invoiceData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setShowInvoice(false);
+      setShowConfirmation(false);
+      
       if (invoiceData.ticket || invoiceData._id || currentTicketId) {
         const ticketId = invoiceData.ticket || invoiceData._id || currentTicketId;
-        setTickets(prev => prev.map(t => t._id === ticketId ? { ...t, invoice: { ...t.invoice, saved: true } } : t));
+        if (currentDocumentType === 'quote') {
+          setQuoteTickets(prev => prev.map(t => t._id === ticketId ? { ...t, quote: { ...t.quote, saved: true } } : t));
+        } else {
+          setTickets(prev => prev.map(t => t._id === ticketId ? { ...t, invoice: { ...t.invoice, saved: true } } : t));
+        }
       }
     } catch (err) {
-      alert('Error saving invoice.');
+      console.error(`Error saving ${currentDocumentType}:`, err);
     }
+  };
+
+  const handleConfirmSave = () => {
+    setShowConfirmation(true);
   };
 
   const handleUpdatePreview = async () => {
@@ -96,14 +148,16 @@ const AdminBilling = () => {
     setLoadingInvoice(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.post(`${API_URL}/admin/invoice/preview`, invoiceData, {
+      const endpoint = currentDocumentType === 'quote' ? 'quote' : 'invoice';
+      
+      const res = await axios.post(`${API_URL}/admin/${endpoint}/preview`, invoiceData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.data && res.data.html) {
         setInvoiceHtml(res.data.html);
       }
     } catch (err) {
-      setInvoiceHtml('<div style="padding:40px;color:red;">Error loading preview.</div>');
+      setInvoiceHtml(`<div style="padding:40px;color:red;">Error loading preview.</div>`);
     } finally {
       setLoadingInvoice(false);
     }
@@ -162,52 +216,111 @@ const AdminBilling = () => {
       <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>
         Billing
       </Typography>
+      
+      {/* Onglets pour séparer Factures et Devis */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={currentTab} onChange={(e, newValue) => setCurrentTab(newValue)} aria-label="billing tabs">
+          <Tab label="Invoices (Done Tickets)" />
+          <Tab label="Quotes (Quote Sent Tickets)" />
+        </Tabs>
+      </Box>
+      
       {loading ? (
         <CircularProgress />
       ) : error ? (
         <Typography color="error">{error}</Typography>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Title</TableCell>
-                <TableCell>Client</TableCell>
-                <TableCell>Company</TableCell>
-                <TableCell>Closing Date</TableCell>
-                <TableCell>Action</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {tickets.map((ticket) => (
-                <TableRow key={ticket._id}>
-                  <TableCell>{ticket.title}</TableCell>
-                  <TableCell>{ticket.client ? `${ticket.client.firstName} ${ticket.client.lastName}` : 'N/A'}</TableCell>
-                  <TableCell>{ticket.client?.company || 'N/A'}</TableCell>
-                  <TableCell>{ticket.updatedAt ? new Date(ticket.updatedAt).toLocaleDateString() : 'N/A'}</TableCell>
-                  <TableCell sx={{ verticalAlign: 'middle', p: 0 }}>
-                    {ticket.invoice?.saved ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', color: 'success.main', fontWeight: 'bold', fontSize: 16, gap: 1.5, minHeight: 56, height: '100%', width: '100%' }}>
-                        <span style={{ fontSize: 24, lineHeight: 1 }}>✔</span>
-                        <span style={{ fontWeight: 600, fontSize: 16 }}>Saved</span>
-                      </Box>
-                    ) : (
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        size="small"
-                        onClick={() => handleShowInvoice(ticket._id)}
-                        sx={{ ml: 0 }}
-                      >
-                        Invoice
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <>
+          {/* Onglet Factures */}
+          {currentTab === 0 && (
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Title</TableCell>
+                    <TableCell>Client</TableCell>
+                    <TableCell>Company</TableCell>
+                    <TableCell>Closing Date</TableCell>
+                    <TableCell>Action</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {tickets.map((ticket) => (
+                    <TableRow key={ticket._id}>
+                      <TableCell>{ticket.title}</TableCell>
+                      <TableCell>{ticket.client ? `${ticket.client.firstName} ${ticket.client.lastName}` : 'N/A'}</TableCell>
+                      <TableCell>{ticket.client?.company || 'N/A'}</TableCell>
+                      <TableCell>{ticket.updatedAt ? new Date(ticket.updatedAt).toLocaleDateString() : 'N/A'}</TableCell>
+                      <TableCell sx={{ verticalAlign: 'middle', p: 0 }}>
+                        {ticket.invoice?.saved ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', color: 'success.main', fontWeight: 'bold', fontSize: 16, gap: 1.5, minHeight: 56, height: '100%', width: '100%' }}>
+                            <span style={{ fontSize: 24, lineHeight: 1 }}>✔</span>
+                            <span style={{ fontWeight: 600, fontSize: 16 }}>Saved</span>
+                          </Box>
+                        ) : (
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            size="small"
+                            onClick={() => handleShowInvoice(ticket._id, 'invoice')}
+                            sx={{ ml: 0 }}
+                          >
+                            Invoice
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+          
+          {/* Onglet Devis */}
+          {currentTab === 1 && (
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Title</TableCell>
+                    <TableCell>Client</TableCell>
+                    <TableCell>Company</TableCell>
+                    <TableCell>Quote Sent Date</TableCell>
+                    <TableCell>Action</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {quoteTickets.map((ticket) => (
+                    <TableRow key={ticket._id}>
+                      <TableCell>{ticket.title}</TableCell>
+                      <TableCell>{ticket.client ? `${ticket.client.firstName} ${ticket.client.lastName}` : 'N/A'}</TableCell>
+                      <TableCell>{ticket.client?.company || 'N/A'}</TableCell>
+                      <TableCell>{ticket.updatedAt ? new Date(ticket.updatedAt).toLocaleDateString() : 'N/A'}</TableCell>
+                      <TableCell sx={{ verticalAlign: 'middle', p: 0 }}>
+                        {ticket.quote?.saved ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', color: 'success.main', fontWeight: 'bold', fontSize: 16, gap: 1.5, minHeight: 56, height: '100%', width: '100%' }}>
+                            <span style={{ fontSize: 24, lineHeight: 1 }}>✔</span>
+                            <span style={{ fontWeight: 600, fontSize: 16 }}>Saved</span>
+                          </Box>
+                        ) : (
+                          <Button
+                            variant="contained"
+                            color="secondary"
+                            size="small"
+                            onClick={() => handleShowInvoice(ticket._id, 'quote')}
+                            sx={{ ml: 0 }}
+                          >
+                            Quote
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </>
       )}
       <Dialog
         open={showInvoice}
@@ -290,9 +403,11 @@ const AdminBilling = () => {
               overflowY: 'auto',
               maxHeight: '100vh',
             }}>
-              <form style={{ width: '100%' }} onSubmit={e => { e.preventDefault(); handleSaveInvoice(); }}>
-                <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold', pt: 2 }}>Edit Invoice</Typography>
-                <TextField fullWidth label="Invoice Number" value={invoiceData.invoiceNumber || ''} onChange={e => setInvoiceData({ ...invoiceData, invoiceNumber: e.target.value })} sx={{ mb: 2 }} />
+              <form style={{ width: '100%' }}>
+                <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold', pt: 2 }}>
+                  Edit {currentDocumentType === 'quote' ? 'Quote' : 'Invoice'}
+                </Typography>
+                <TextField fullWidth label={currentDocumentType === 'quote' ? 'Quote Number' : 'Invoice Number'} value={invoiceData.invoiceNumber || ''} onChange={e => setInvoiceData({ ...invoiceData, invoiceNumber: e.target.value })} sx={{ mb: 2 }} />
                 <TextField fullWidth label="Date" value={invoiceData.date || ''} onChange={e => setInvoiceData({ ...invoiceData, date: e.target.value })} sx={{ mb: 2 }} />
                 <TextField fullWidth label="Due Date" value={invoiceData.dueDate || ''} onChange={e => setInvoiceData({ ...invoiceData, dueDate: e.target.value })} sx={{ mb: 2 }} />
                 <TextField fullWidth label="Reference" value={invoiceData.reference || ''} onChange={e => setInvoiceData({ ...invoiceData, reference: e.target.value })} sx={{ mb: 2 }} />
@@ -320,7 +435,9 @@ const AdminBilling = () => {
                   <Button variant="contained" color="primary" onClick={handleUpdatePreview} disabled={loadingInvoice}>
                     {loadingInvoice ? 'Updating...' : 'Update Preview'}
                   </Button>
-                  <Button variant="contained" color="success" type="submit">Save</Button>
+                  <Button variant="contained" color="success" onClick={handleConfirmSave}>
+                    Save {currentDocumentType === 'quote' ? 'Quote' : 'Invoice'}
+                  </Button>
                 </Box>
               </form>
             </Box>
@@ -356,9 +473,113 @@ const AdminBilling = () => {
               />
             </Box>
           </Box>
+        ) : isInvoiceLocked ? (
+          <Box sx={{
+            p: 0,
+            background: '#f5f5f5',
+            minHeight: '100vh',
+            height: '100vh',
+            width: '100vw',
+            maxWidth: '100vw',
+            maxHeight: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            {/* Message d'avertissement */}
+            <Box sx={{
+              position: 'absolute',
+              top: 80,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: '#fff3cd',
+              border: '1px solid #ffc107',
+              borderRadius: 2,
+              p: 3,
+              mb: 3,
+              boxShadow: 2,
+              zIndex: 10,
+              maxWidth: '80%',
+              textAlign: 'center'
+            }}>
+              <Typography variant="h6" sx={{ color: '#856404', fontWeight: 'bold', mb: 1 }}>
+                🔒 {currentDocumentType === 'quote' ? 'Devis Verrouillé' : 'Facture Verrouillée'}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#856404' }}>
+                {currentDocumentType === 'quote' 
+                  ? 'Ce devis a été sauvegardé et est maintenant verrouillé pour respecter la conformité légale. Aucune modification n\'est possible.'
+                  : 'Cette facture a été sauvegardée et est maintenant verrouillée pour respecter la conformité légale. Aucune modification n\'est possible.'
+                }
+              </Typography>
+            </Box>
+            
+            {/* Facture en lecture seule */}
+            <Box sx={{
+              width: '100%',
+              height: '100%',
+              background: '#fff',
+              overflowY: 'auto',
+              pt: 12, // Espace pour le message d'avertissement
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+            }}>
+              <div
+                style={{
+                  width: '100%',
+                  maxWidth: '900px',
+                  minWidth: 320,
+                  background: '#fff',
+                  padding: 20,
+                  margin: '0 auto',
+                  overflowX: 'auto',
+                  display: 'block',
+                }}
+                dangerouslySetInnerHTML={{ __html: invoiceHtml }}
+              />
+            </Box>
+          </Box>
         ) : (
           <div style={{ padding: 40, textAlign: 'center', color: 'red' }}>Error loading invoice.</div>
         )}
+      </Dialog>
+      
+      {/* Dialog de confirmation pour la sauvegarde */}
+      <Dialog
+        open={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#d32f2f' }}>
+            ⚠️ Important Notice
+          </Typography>
+          <Typography variant="body1" sx={{ mb: 3, lineHeight: 1.6 }}>
+            Once this {currentDocumentType === 'quote' ? 'quote' : 'invoice'} is saved, it will be permanently locked and cannot be modified for legal compliance reasons.
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 4, color: '#666', fontStyle: 'italic' }}>
+            Are you sure you want to proceed?
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+            <Button 
+              variant="outlined" 
+              onClick={() => setShowConfirmation(false)}
+              sx={{ minWidth: 100 }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="contained" 
+              color="success" 
+              onClick={handleSaveInvoice}
+              sx={{ minWidth: 100 }}
+            >
+              Save & Lock
+            </Button>
+          </Box>
+        </Box>
       </Dialog>
     </Box>
   );

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, CircularProgress, Card, CardContent, Chip, Stack, useMediaQuery, useTheme } from '@mui/material';
+import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, CircularProgress, Card, CardContent, Chip, Stack, useMediaQuery, useTheme, Tabs, Tab } from '@mui/material';
 import axios from 'axios';
 import API_URL from '../config/api';
 import html2pdf from 'html2pdf.js';
@@ -10,53 +10,69 @@ import CloseIcon from '@mui/icons-material/Close';
 
 const ClientBilling = () => {
   const [invoices, setInvoices] = useState([]);
+  const [quotes, setQuotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [previewHtml, setPreviewHtml] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [showInvoice, setShowInvoice] = useState(false);
-  const [invoiceHtml, setInvoiceHtml] = useState('');
-  const [loadingInvoice, setLoadingInvoice] = useState(false);
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState(null);
+  const [showDocument, setShowDocument] = useState(false);
+  const [documentHtml, setDocumentHtml] = useState('');
+  const [loadingDocument, setLoadingDocument] = useState(false);
+  const [selectedDocumentId, setSelectedDocumentId] = useState(null);
   const [paidInput, setPaidInput] = useState('');
   const [paidError, setPaidError] = useState('');
   const [paidDialogOpen, setPaidDialogOpen] = useState(false);
   const [paidDialogInvoice, setPaidDialogInvoice] = useState(null);
+  const [paidDialogQuote, setPaidDialogQuote] = useState(null);
+  const [currentTab, setCurrentTab] = useState(0);
   
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
-    const fetchInvoices = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const res = await axios.get(`${API_URL}/billing/invoices`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setInvoices(res.data);
+        
+        // Récupérer les factures et les devis en parallèle
+        const [invoicesRes, quotesRes] = await Promise.all([
+          axios.get(`${API_URL}/billing/invoices`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          axios.get(`${API_URL}/billing/quotes`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        ]);
+        
+        setInvoices(invoicesRes.data);
+        setQuotes(quotesRes.data);
       } catch (err) {
-        setError('Error loading invoices.');
+        setError('Error loading billing data.');
       } finally {
         setLoading(false);
       }
     };
-    fetchInvoices();
+    fetchData();
   }, []);
 
-  const handleShowInvoice = async (invoiceId) => {
-    setLoadingInvoice(true);
-    setShowInvoice(true);
+  const handleShowDocument = async (documentId, documentType) => {
+    setLoadingDocument(true);
+    setShowDocument(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${API_URL}/invoice/html/${invoiceId}`, {
+      const endpoint = documentType === 'invoice' ? 
+        `/invoice/html/${documentId}` : 
+        `/quote/html/${documentId}`;
+      
+      const res = await axios.get(`${API_URL}${endpoint}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setInvoiceHtml(res.data.html || res.data);
+      setDocumentHtml(res.data.html || res.data);
     } catch (err) {
-      setInvoiceHtml('<div style="padding:40px;color:red;">Error loading invoice.</div>');
+      setDocumentHtml(`<div style="padding:40px;color:red;">Error loading ${documentType}.</div>`);
     } finally {
-      setLoadingInvoice(false);
+      setLoadingDocument(false);
     }
   };
 
@@ -78,35 +94,43 @@ const ClientBilling = () => {
     });
   };
 
-  const handleDownloadInvoice = async (invoiceId) => {
+  const handleDownloadDocument = async (documentId, documentType) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${API_URL}/invoice/html/${invoiceId}`, {
+      const endpoint = documentType === 'invoice' ? 
+        `/invoice/html/${documentId}` : 
+        `/quote/html/${documentId}`;
+      
+      const res = await axios.get(`${API_URL}${endpoint}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const html = res.data.html || res.data;
       const a4 = document.createElement('div');
       a4.innerHTML = html;
+      
       // Convertir l'image en base64 avant la génération du PDF
       const img = a4.querySelector('.logo-img');
       if (img) {
         const base64Image = await convertImageToBase64(img.src);
         img.src = base64Image;
       }
+      
+      const filename = documentType === 'invoice' ? 'invoice.pdf' : 'quote.pdf';
       html2pdf().from(a4).set({
         margin: 0,
-        filename: 'invoice.pdf',
+        filename: filename,
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       }).save();
     } catch (err) {
-      alert('Erreur lors de la génération du PDF.');
+      console.error(`Erreur lors de la génération du PDF ${documentType}:`, err);
     }
   };
 
   const handlePaidClick = (invoiceId) => {
     const invoice = invoices.find(inv => inv._id === invoiceId);
     setPaidDialogInvoice(invoice);
+    setPaidDialogQuote(null);
     setPaidDialogOpen(true);
   };
 
@@ -120,14 +144,51 @@ const ClientBilling = () => {
       setPaidDialogOpen(false);
       setInvoices(invoices.map(inv => inv._id === paidDialogInvoice._id ? { ...inv, paid: true } : inv));
     } catch (err) {
-      alert('Error updating invoice status.');
+      console.error('Error updating invoice status:', err);
     }
   };
 
+  const handleAcceptAndPayQuote = (quoteId) => {
+    const quote = quotes.find(q => q._id === quoteId);
+    setPaidDialogQuote(quote);
+    setPaidDialogInvoice(null);
+    setPaidDialogOpen(true);
+  };
+
+  const handleMarkQuoteAsPaid = async () => {
+    if (!paidDialogQuote) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(`${API_URL}/quote/mark-accepted-paid/${paidDialogQuote._id}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPaidDialogOpen(false);
+      setQuotes(quotes.map(quote => quote._id === paidDialogQuote._id ? { ...quote, accepted: true, paid: true } : quote));
+    } catch (err) {
+      console.error('Error updating quote status:', err);
+    }
+  };
+
+  const handleAcceptQuote = async (quoteId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(`${API_URL}/quote/mark-accepted/${quoteId}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setQuotes(quotes.map(quote => quote._id === quoteId ? { ...quote, accepted: true } : quote));
+    } catch (err) {
+      console.error('Error updating quote status:', err);
+    }
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setCurrentTab(newValue);
+  };
+
   // Mobile invoice card component
-  const renderMobileInvoiceCard = (invoice) => (
+  const renderMobileCard = (document, documentType) => (
     <Card 
-      key={invoice._id} 
+      key={document._id} 
       sx={{ 
         mb: 2, 
         boxShadow: 2,
@@ -138,31 +199,63 @@ const ClientBilling = () => {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'primary.main' }}>
-              {invoice.invoiceNumber}
+              {documentType === 'invoice' ? document.invoiceNumber : document.quoteNumber}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {invoice.date}
+              {document.date}
             </Typography>
           </Box>
-          {invoice.paid ? (
-            <Chip 
-              label="PAID" 
-              color="success" 
-              size="small"
-              sx={{ fontWeight: 'bold' }}
-            />
+          {documentType === 'invoice' ? (
+            document.paid ? (
+              <Chip 
+                label="PAID" 
+                color="success" 
+                size="small"
+                sx={{ fontWeight: 'bold' }}
+              />
+            ) : document.accepted ? (
+              <Chip 
+                label="ACCEPTED" 
+                color="info" 
+                size="small"
+                sx={{ fontWeight: 'bold' }}
+              />
+            ) : (
+              <Chip 
+                label="PENDING" 
+                color="warning" 
+                size="small"
+                sx={{ fontWeight: 'bold' }}
+              />
+            )
           ) : (
-            <Chip 
-              label="UNPAID" 
-              color="warning" 
-              size="small"
-              sx={{ fontWeight: 'bold' }}
-            />
+            document.paid ? (
+              <Chip 
+                label="PAID" 
+                color="success" 
+                size="small"
+                sx={{ fontWeight: 'bold' }}
+              />
+            ) : document.accepted ? (
+              <Chip 
+                label="ACCEPTED" 
+                color="info" 
+                size="small"
+                sx={{ fontWeight: 'bold' }}
+              />
+            ) : (
+              <Chip 
+                label="PENDING" 
+                color="warning" 
+                size="small"
+                sx={{ fontWeight: 'bold' }}
+              />
+            )
           )}
         </Box>
         
         <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-          Amount: {invoice.totalDue || invoice.amount || '-'}
+          Amount: R{document.totalDue || document.amount || '-'}
         </Typography>
         
         <Stack spacing={1}>
@@ -171,36 +264,124 @@ const ClientBilling = () => {
             color="primary"
             size="small"
             fullWidth
-            onClick={() => { handleShowInvoice(invoice._id); setSelectedInvoiceId(invoice._id); }}
+            onClick={() => { 
+              handleShowDocument(document._id, documentType); 
+              setSelectedDocumentId(document._id); 
+            }}
             sx={{ minHeight: '40px' }}
           >
-            View Invoice
+            View {documentType === 'invoice' ? 'Invoice' : 'Quote'}
           </Button>
           <Button 
             variant="outlined" 
             color="secondary"
             size="small"
             fullWidth
-            onClick={() => handleDownloadInvoice(invoice._id)}
+            onClick={() => handleDownloadDocument(document._id, documentType)}
             sx={{ minHeight: '40px' }}
           >
             Download PDF
           </Button>
-          {!invoice.paid && (
-            <Button 
-              variant="contained" 
-              color="success"
-              size="small"
-              fullWidth
-              onClick={() => handlePaidClick(invoice._id)}
-              sx={{ minHeight: '40px', fontWeight: 'bold' }}
-            >
-              PAY
-            </Button>
+          {documentType === 'invoice' ? (
+            !document.paid && (
+              <Button 
+                variant="contained" 
+                color="success"
+                size="small"
+                fullWidth
+                onClick={() => handlePaidClick(document._id)}
+                sx={{ minHeight: '40px', fontWeight: 'bold' }}
+              >
+                PAY
+              </Button>
+            )
+          ) : (
+            !document.accepted && !document.paid && (
+              <Button 
+                variant="contained" 
+                color="success"
+                size="small"
+                fullWidth
+                onClick={() => handleAcceptAndPayQuote(document._id)}
+                sx={{ minHeight: '40px', fontWeight: 'bold' }}
+              >
+                ACCEPT & PAY
+              </Button>
+            )
           )}
         </Stack>
       </CardContent>
     </Card>
+  );
+
+  const renderTable = (data, documentType) => (
+    <TableContainer component={Paper}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell sx={{ fontWeight: 'bold' }}>Number</TableCell>
+            <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+            <TableCell sx={{ fontWeight: 'bold' }}>Amount</TableCell>
+            <TableCell sx={{ fontWeight: 'bold' }}>Action</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {data.map((document) => (
+            <TableRow key={document._id}>
+              <TableCell>
+                {documentType === 'invoice' ? document.invoiceNumber : document.quoteNumber}
+              </TableCell>
+              <TableCell>{document.date}</TableCell>
+              <TableCell>R{document.totalDue || document.amount || '-'}</TableCell>
+              <TableCell>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="small"
+                  onClick={() => { 
+                    handleShowDocument(document._id, documentType); 
+                    setSelectedDocumentId(document._id); 
+                  }}
+                  sx={{ mr: 1 }}
+                >
+                  View
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  size="small"
+                  onClick={() => handleDownloadDocument(document._id, documentType)}
+                  sx={{ mr: 1 }}
+                >
+                  Download
+                </Button>
+                {documentType === 'invoice' ? (
+                  <Button
+                    variant="contained"
+                    color="success"
+                    size="small"
+                    disabled={document.paid}
+                    onClick={() => handlePaidClick(document._id)}
+                  >
+                    PAY
+                  </Button>
+                ) : (
+                  <Button
+                    variant="contained"
+                    color="success"
+                    size="small"
+                    disabled={document.accepted || document.paid}
+                    onClick={() => handleAcceptAndPayQuote(document._id)}
+                  >
+                    ACCEPT & PAY
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 
   return (
@@ -208,79 +389,43 @@ const ClientBilling = () => {
       <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold', fontSize: { xs: '1.5rem', sm: '2rem' } }}>
         Billing
       </Typography>
+      
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
           <CircularProgress />
         </Box>
       ) : error ? (
         <Typography color="error">{error}</Typography>
-      ) : invoices.length === 0 ? (
+      ) : invoices.length === 0 && quotes.length === 0 ? (
         <Card sx={{ textAlign: 'center', p: 3 }}>
-          <Typography>No invoices found.</Typography>
+          <Typography>No invoices or quotes found.</Typography>
         </Card>
       ) : (
         <>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+            <Tabs value={currentTab} onChange={handleTabChange}>
+              <Tab label={`Invoices (${invoices.length})`} />
+              <Tab label={`Quotes (${quotes.length})`} />
+            </Tabs>
+          </Box>
+          
           {/* Mobile View */}
           {isMobile ? (
             <Box>
-              {invoices.map(renderMobileInvoiceCard)}
+              {currentTab === 0 && invoices.map(invoice => renderMobileCard(invoice, 'invoice'))}
+              {currentTab === 1 && quotes.map(quote => renderMobileCard(quote, 'quote'))}
             </Box>
           ) : (
             /* Desktop Table View */
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Number</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Amount</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Action</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {invoices.map((invoice) => (
-                    <TableRow key={invoice._id}>
-                      <TableCell>{invoice.invoiceNumber}</TableCell>
-                      <TableCell>{invoice.date}</TableCell>
-                      <TableCell>{invoice.totalDue || invoice.amount || '-'}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          size="small"
-                          onClick={() => { handleShowInvoice(invoice._id); setSelectedInvoiceId(invoice._id); }}
-                          sx={{ mr: 1 }}
-                        >
-                          View
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          color="secondary"
-                          size="small"
-                          onClick={() => handleDownloadInvoice(invoice._id)}
-                          sx={{ mr: 1 }}
-                        >
-                          Download
-                        </Button>
-                        <Button
-                          variant="contained"
-                          color="success"
-                          size="small"
-                          disabled={invoice.paid}
-                          onClick={() => handlePaidClick(invoice._id)}
-                        >
-                          PAY
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <>
+              {currentTab === 0 && renderTable(invoices, 'invoice')}
+              {currentTab === 1 && renderTable(quotes, 'quote')}
+            </>
           )}
         </>
       )}
-      <Dialog open={showInvoice} onClose={() => setShowInvoice(false)} maxWidth="lg" fullWidth
+      
+      <Dialog open={showDocument} onClose={() => setShowDocument(false)} maxWidth="lg" fullWidth
         PaperProps={{
           style: {
             background: '#e5e5e5',
@@ -292,45 +437,15 @@ const ClientBilling = () => {
           }
         }}
       >
-        {loadingInvoice ? (
+        {loadingDocument ? (
           <div style={{ padding: 40, textAlign: 'center' }}><CircularProgress /></div>
         ) : (
           <div style={{ minHeight: 600, background: '#e5e5e5' }}>
-            <div dangerouslySetInnerHTML={{ __html: invoiceHtml }} />
-            <Box sx={{ mt: 3, p: 2, background: '#fff', borderRadius: 2, boxShadow: 1 }}>
-              <Typography variant="h6" sx={{ mb: 1 }}>Payment Information</Typography>
-              <Typography variant="body2">Beneficiary: Bitrix IT</Typography>
-              <Typography variant="body2">BANK: StandardBank Tyger Manor</Typography>
-              <Typography variant="body2">BRANCH CODE: 050410</Typography>
-              <Typography variant="body2">ACCOUNT NUMBER: 401823768</Typography>
-              {!invoices.find(inv => inv._id === selectedInvoiceId)?.paid && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography sx={{ mb: 1 }}>To mark the invoice as paid, type paid below:</Typography>
-                  <TextField
-                    value={paidInput}
-                    onChange={e => { setPaidInput(e.target.value); setPaidError(''); }}
-                    error={!!paidError}
-                    helperText={paidError}
-                    size="small"
-                    label="Confirmation"
-                  />
-                  <Button
-                    variant="contained"
-                    color="success"
-                    sx={{ mt: 2, ml: 2 }}
-                    onClick={handleMarkAsPaid}
-                  >
-                    Confirm
-                  </Button>
-                </Box>
-              )}
-              {invoices.find(inv => inv._id === selectedInvoiceId)?.paid && (
-                <Typography color="success.main" sx={{ mt: 1 }}>Invoice marked as paid</Typography>
-              )}
-            </Box>
+            <div dangerouslySetInnerHTML={{ __html: documentHtml }} />
           </div>
         )}
       </Dialog>
+      
       <Dialog open={paidDialogOpen} onClose={() => setPaidDialogOpen(false)} maxWidth="xs" fullWidth>
         <Box sx={{ p: 4, background: '#fff', borderRadius: 2, position: 'relative' }}>
           <IconButton
@@ -345,12 +460,12 @@ const ClientBilling = () => {
           <Typography variant="body2">BANK: StandardBank Tyger Manor</Typography>
           <Typography variant="body2">BRANCH CODE: 050410</Typography>
           <Typography variant="body2">ACCOUNT NUMBER: 401823768</Typography>
-          {paidDialogInvoice && (
+          {(paidDialogInvoice || paidDialogQuote) && (
             <Typography variant="body2" sx={{ mt: 2, fontWeight: 'bold' }}>
-              Amount to pay: {paidDialogInvoice.totalDue || paidDialogInvoice.amount || '-'}
+              Amount to pay: R{(paidDialogInvoice?.totalDue || paidDialogInvoice?.amount || paidDialogQuote?.totalDue || paidDialogQuote?.amount) || '-'}
             </Typography>
           )}
-          {!paidDialogInvoice?.paid && (
+          {paidDialogInvoice && !paidDialogInvoice?.paid && (
             <Button
               variant="contained"
               color="success"
@@ -358,11 +473,25 @@ const ClientBilling = () => {
               onClick={handleMarkAsPaid}
               fullWidth
             >
-              Confirm
+              Confirm Payment
+            </Button>
+          )}
+          {paidDialogQuote && !paidDialogQuote?.accepted && (
+            <Button
+              variant="contained"
+              color="success"
+              sx={{ mt: 4, ml: 0 }}
+              onClick={handleMarkQuoteAsPaid}
+              fullWidth
+            >
+              Confirm Payment & Accept Quote
             </Button>
           )}
           {paidDialogInvoice?.paid && (
             <Typography color="success.main" sx={{ mt: 2 }}>Invoice marked as paid</Typography>
+          )}
+          {paidDialogQuote?.accepted && (
+            <Typography color="success.main" sx={{ mt: 2 }}>Quote accepted and marked as paid</Typography>
           )}
         </Box>
       </Dialog>

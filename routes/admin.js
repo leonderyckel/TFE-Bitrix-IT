@@ -544,7 +544,7 @@ router.post('/tickets/:id/progress', async (req, res) => {
 // Récupérer un ticket spécifique
 router.get('/tickets/:id', async (req, res) => {
   try {
-    const { Ticket, AdminUser } = getModels(); // Assurez-vous que AdminUser est bien récupéré ici
+    const { Ticket, AdminUser, Quote } = getModels(); // Assurez-vous que AdminUser est bien récupéré ici
     const ticket = await Ticket.findById(req.params.id)
       .populate('client', 'firstName lastName email company')
       // --- MODIFICATION ICI ---
@@ -561,7 +561,23 @@ router.get('/tickets/:id', async (req, res) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
     
-    res.json(ticket);
+    // Ajouter les informations du devis si il existe
+    let ticketObject = ticket.toObject();
+    if (ticketObject.quote && ticketObject.quote.saved) {
+      try {
+        const quote = await Quote.findOne({ ticket: ticketObject._id }).select('accepted paid').lean();
+        if (quote) {
+          ticketObject.quoteDetails = {
+            accepted: quote.accepted,
+            paid: quote.paid
+          };
+        }
+      } catch (quoteError) {
+        console.error('Error fetching quote details:', quoteError);
+      }
+    }
+    
+    res.json(ticketObject);
   } catch (error) {
     console.error('Error fetching ticket for admin:', error);
     res.status(500).json({ message: 'Server error', error: error.message }); // Added error details
@@ -2530,6 +2546,23 @@ router.get('/billing/closed-tickets', async (req, res) => {
   }
 });
 
+// GET /api/admin/billing/quote-sent-tickets
+router.get('/billing/quote-sent-tickets', async (req, res) => {
+  try {
+    const { Ticket } = getModels();
+    const quoteSentTickets = await Ticket.find({ 
+      $or: [
+        { status: 'quote-sent' },
+        { 'progress.status': 'quote-sent' }
+      ]
+    }).populate('client', 'firstName lastName email address company');
+    res.json(quoteSentTickets);
+  } catch (error) {
+    console.error('Error fetching quote-sent tickets for billing:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Aperçu HTML de la facture pour un ticket donné
 router.get('/invoice/preview/:ticketId', async (req, res) => {
   try {
@@ -2599,10 +2632,99 @@ router.get('/invoice/preview/:ticketId', async (req, res) => {
   }
 });
 
+// Aperçu HTML du devis pour un ticket donné
+router.get('/quote/preview/:ticketId', async (req, res) => {
+  try {
+    const { Ticket, User, QuoteCounter } = getModels();
+    const ticket = await Ticket.findById(req.params.ticketId).populate('client');
+    if (!ticket) return res.status(404).send('Ticket not found');
+
+    // Numéro de devis incrémental
+    const nextNumber = await getNextQuoteNumber(getModels);
+    const quoteNumber = `QTE${String(nextNumber).padStart(3, '0')}`;
+
+    // Lis le template HTML (utilise le même template que les factures)
+    const templatePath = path.join(__dirname, '../templates/invoiceTemplate.html');
+    const templateSource = fs.readFileSync(templatePath, 'utf8');
+    const template = Handlebars.compile(templateSource);
+
+    // Prépare les données à injecter
+    const client = ticket.client || {};
+    const data = {
+      companyName: 'Bitrix IT CC',
+      companyAddress: [
+        '3A Kariga Street',
+        'Stikland Industrial',
+        'Western Cape',
+        '7530'
+      ],
+      companyVAT: '4440316406',
+      clientName: client.firstName ? `${client.firstName} ${client.lastName}` : '',
+      clientAddress: client.address || '',
+      clientVAT: client.vat || '',
+      invoiceNumber: quoteNumber, // Utilise le numéro de devis
+      date: new Date().toLocaleDateString(),
+      dueDate: new Date().toLocaleDateString(),
+      reference: ticket.title,
+      salesRep: ticket.technician ? ticket.technician.firstName + ' ' + ticket.technician.lastName : '',
+      discount: ticket.quote?.discount || 0,
+      items: [
+        {
+          description: ticket.title,
+          subDescription: ticket.description,
+          quantity: 1,
+          unitPrice: ticket.quote?.amount || 0,
+          total: ticket.quote?.amount || 0
+        }
+      ],
+      totalDiscount: 0,
+      totalExclusive: ticket.quote?.amount || 0,
+      totalVAT: 0,
+      subTotal: ticket.quote?.amount || 0,
+      totalDue: ticket.quote?.amount || 0,
+      notes: [
+        'This is a quote. Please contact us to proceed with the order.',
+        'Quote valid for 30 days from issue date.',
+        'Beneficiary: Bitrix IT',
+        'BANK: StandardBank Tyger Manor',
+        'BRANCH CODE: 050410',
+        'ACCOUNT NUMBER: 401823768'
+      ],
+      bankDetails: '',
+      client: client._id || client,
+      ticket: ticket._id,
+      isQuote: true // Flag pour différencier du template facture
+    };
+
+    const html = template(data);
+    res.json({ html, data });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Erreur serveur');
+  }
+});
+
 // Aperçu HTML de la facture à partir de données envoyées (pour update preview)
 router.post('/invoice/preview', async (req, res) => {
   try {
     // Les données de la facture sont dans req.body
+    const data = req.body;
+    // Lis le template HTML
+    const templatePath = path.join(__dirname, '../templates/invoiceTemplate.html');
+    const templateSource = fs.readFileSync(templatePath, 'utf8');
+    const template = Handlebars.compile(templateSource);
+    const html = template(data);
+    res.json({ html, data });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Erreur serveur');
+  }
+});
+
+// Aperçu HTML du devis à partir de données envoyées (pour update preview)
+router.post('/quote/preview', async (req, res) => {
+  try {
+    // Les données du devis sont dans req.body
     const data = req.body;
     // Lis le template HTML
     const templatePath = path.join(__dirname, '../templates/invoiceTemplate.html');
@@ -2627,25 +2749,185 @@ async function getNextInvoiceNumber(getModels) {
   return counter.seq;
 }
 
+// Fonction pour obtenir le prochain numéro de devis incrémental
+async function getNextQuoteNumber(getModels) {
+  const { QuoteCounter } = getModels();
+  const counter = await QuoteCounter.findOneAndUpdate(
+    { name: 'quote' },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+  return counter.seq;
+}
+
 router.post('/invoice', async (req, res) => {
   try {
     const { Invoice } = getModels();
     const invoiceData = req.body;
+    
+    console.log('=== INVOICE CREATION DEBUG ===');
+    console.log('Received invoice data:', JSON.stringify(invoiceData, null, 2));
+    
+    // Nettoyer et valider les données
+    const cleanedData = {
+      ...invoiceData,
+      // S'assurer que client et ticket sont des ObjectIds valides
+      client: typeof invoiceData.client === 'object' ? invoiceData.client._id || invoiceData.client : invoiceData.client,
+      ticket: typeof invoiceData.ticket === 'object' ? invoiceData.ticket._id || invoiceData.ticket : invoiceData.ticket
+    };
+    
+    console.log('Cleaned invoice data:', JSON.stringify(cleanedData, null, 2));
+    
+    // Vérifier que les champs requis sont présents
+    if (!cleanedData.invoiceNumber) {
+      console.log('ERROR: Missing invoice number');
+      return res.status(400).json({ message: 'Invoice number is required.' });
+    }
+    
+    if (!cleanedData.ticket) {
+      console.log('ERROR: Missing ticket ID');
+      return res.status(400).json({ message: 'Ticket ID is required.' });
+    }
+    
+    if (!cleanedData.client) {
+      console.log('ERROR: Missing client ID');
+      return res.status(400).json({ message: 'Client ID is required.' });
+    }
+    
     // Vérifie qu'il n'y a pas déjà une facture avec ce numéro
-    const existing = await Invoice.findOne({ invoiceNumber: invoiceData.invoiceNumber });
-    if (existing) {
+    const existingByNumber = await Invoice.findOne({ invoiceNumber: cleanedData.invoiceNumber });
+    if (existingByNumber) {
+      console.log('ERROR: Invoice number already exists:', cleanedData.invoiceNumber);
       return res.status(400).json({ message: 'Invoice number already exists.' });
     }
-    const invoice = new Invoice(invoiceData);
-    await invoice.save();
-    // Marquer le ticket comme 'Enregistré'
-    if (invoiceData.ticket) {
-      const { Ticket } = getModels();
-      await Ticket.findByIdAndUpdate(invoiceData.ticket, { 'invoice.saved': true });
+    console.log('✓ Invoice number is unique:', cleanedData.invoiceNumber);
+    
+    // Vérifie qu'il n'y a pas déjà une facture pour ce ticket
+    const existingByTicket = await Invoice.findOne({ ticket: cleanedData.ticket });
+    if (existingByTicket) {
+      console.log('ERROR: Invoice already exists for ticket:', cleanedData.ticket);
+      console.log('Existing invoice:', existingByTicket);
+      return res.status(400).json({ 
+        message: 'Une facture existe déjà pour ce ticket.',
+        isLocked: existingByTicket.isLocked,
+        invoiceId: existingByTicket._id
+      });
     }
+    console.log('✓ No existing invoice for ticket:', cleanedData.ticket);
+    
+    const invoice = new Invoice({
+      ...cleanedData,
+      isLocked: true // Verrouiller immédiatement pour conformité légale
+    });
+    
+    console.log('Invoice object created, attempting to save...');
+    await invoice.save();
+    console.log('✓ Invoice saved successfully with ID:', invoice._id);
+    
+    // Marquer le ticket comme 'Enregistré'
+    if (cleanedData.ticket) {
+      const { Ticket } = getModels();
+      await Ticket.findByIdAndUpdate(cleanedData.ticket, { 'invoice.saved': true });
+      console.log('✓ Ticket marked as saved');
+    }
+    
+    console.log('=== INVOICE CREATION SUCCESS ===');
     res.status(201).json(invoice);
   } catch (err) {
+    console.error('=== INVOICE CREATION ERROR ===');
     console.error('Error creating invoice:', err);
+    console.error('Error name:', err.name);
+    console.error('Error message:', err.message);
+    if (err.errors) {
+      console.error('Validation errors:', err.errors);
+    }
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Création d'un devis
+router.post('/quote', async (req, res) => {
+  try {
+    const { Quote } = getModels();
+    const quoteData = req.body;
+    
+    console.log('=== QUOTE CREATION DEBUG ===');
+    console.log('Received quote data:', JSON.stringify(quoteData, null, 2));
+    
+    // Nettoyer et valider les données
+    const cleanedData = {
+      ...quoteData,
+      // S'assurer que client et ticket sont des ObjectIds valides
+      client: typeof quoteData.client === 'object' ? quoteData.client._id || quoteData.client : quoteData.client,
+      ticket: typeof quoteData.ticket === 'object' ? quoteData.ticket._id || quoteData.ticket : quoteData.ticket
+    };
+    
+    console.log('Cleaned quote data:', JSON.stringify(cleanedData, null, 2));
+    
+    // Vérifier que les champs requis sont présents
+    if (!cleanedData.invoiceNumber) { // Utilise le même champ pour le numéro de devis
+      console.log('ERROR: Missing quote number');
+      return res.status(400).json({ message: 'Quote number is required.' });
+    }
+    
+    if (!cleanedData.ticket) {
+      console.log('ERROR: Missing ticket ID');
+      return res.status(400).json({ message: 'Ticket ID is required.' });
+    }
+    
+    if (!cleanedData.client) {
+      console.log('ERROR: Missing client ID');
+      return res.status(400).json({ message: 'Client ID is required.' });
+    }
+    
+    // Vérifie qu'il n'y a pas déjà un devis avec ce numéro
+    const existingByNumber = await Quote.findOne({ quoteNumber: cleanedData.invoiceNumber });
+    if (existingByNumber) {
+      console.log('ERROR: Quote number already exists:', cleanedData.invoiceNumber);
+      return res.status(400).json({ message: 'Quote number already exists.' });
+    }
+    console.log('✓ Quote number is unique:', cleanedData.invoiceNumber);
+    
+    // Vérifie qu'il n'y a pas déjà un devis pour ce ticket
+    const existingByTicket = await Quote.findOne({ ticket: cleanedData.ticket });
+    if (existingByTicket) {
+      console.log('ERROR: Quote already exists for ticket:', cleanedData.ticket);
+      console.log('Existing quote:', existingByTicket);
+      return res.status(400).json({ 
+        message: 'Un devis existe déjà pour ce ticket.',
+        isLocked: existingByTicket.isLocked,
+        quoteId: existingByTicket._id
+      });
+    }
+    console.log('✓ No existing quote for ticket:', cleanedData.ticket);
+    
+    const quote = new Quote({
+      ...cleanedData,
+      quoteNumber: cleanedData.invoiceNumber, // Stocker le numéro de devis
+      isLocked: true // Verrouiller immédiatement pour conformité légale
+    });
+    
+    console.log('Quote object created, attempting to save...');
+    await quote.save();
+    console.log('✓ Quote saved successfully with ID:', quote._id);
+    
+    // Marquer le ticket comme 'Devis sauvegardé'
+    if (cleanedData.ticket) {
+      const { Ticket } = getModels();
+      await Ticket.findByIdAndUpdate(cleanedData.ticket, { 'quote.saved': true });
+      console.log('✓ Ticket marked as quote saved');
+    }
+    
+    console.log('=== QUOTE CREATION SUCCESS ===');
+    res.status(201).json(quote);
+  } catch (err) {
+    console.error('=== QUOTE CREATION ERROR ===');
+    console.error('Error creating quote:', err);
+    console.error('Error name:', err.name);
+    console.error('Error message:', err.message);
+    if (err.errors) {
+      console.error('Validation errors:', err.errors);
+    }
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -2660,6 +2942,19 @@ router.get('/invoices', async (req, res) => {
     res.json(invoices);
   } catch (err) {
     res.status(500).json({ message: 'Error loading invoices.' });
+  }
+});
+
+// --- ROUTES DEVIS ---
+
+// Liste tous les devis pour l'historique
+router.get('/quotes', async (req, res) => {
+  const { Quote } = getModels();
+  try {
+    const quotes = await Quote.find().sort({ date: -1 });
+    res.json(quotes);
+  } catch (err) {
+    res.status(500).json({ message: 'Error loading quotes.' });
   }
 });
 
@@ -2757,6 +3052,110 @@ router.get('/invoice/html/:id', async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: 'Error generating invoice HTML.' });
     }
+});
+
+// Vérifie si une facture existe déjà pour un ticket et si elle est verrouillée
+router.get('/invoice/check/:ticketId', async (req, res) => {
+  try {
+    const { Invoice } = getModels();
+    const invoice = await Invoice.findOne({ ticket: req.params.ticketId });
+    if (invoice) {
+      res.json({ 
+        exists: true, 
+        isLocked: invoice.isLocked,
+        invoiceId: invoice._id,
+        invoiceNumber: invoice.invoiceNumber 
+      });
+    } else {
+      res.json({ exists: false, isLocked: false });
+    }
+  } catch (err) {
+    res.status(500).json({ message: 'Error checking invoice status.' });
+  }
+});
+
+// Route PUT pour mise à jour des factures (avec protection contre les modifications de factures verrouillées)
+router.put('/invoice/:id', async (req, res) => {
+  try {
+    const { Invoice } = getModels();
+    const invoice = await Invoice.findById(req.params.id);
+    
+    if (!invoice) {
+      return res.status(404).json({ message: 'Invoice not found.' });
+    }
+    
+    // Empêcher la modification des factures verrouillées
+    if (invoice.isLocked) {
+      return res.status(403).json({ 
+        message: 'Cette facture est verrouillée et ne peut plus être modifiée pour des raisons de conformité légale.',
+        isLocked: true
+      });
+    }
+    
+    // Mettre à jour les champs autorisés
+    Object.keys(req.body).forEach(key => {
+      if (key !== '_id' && key !== '__v' && key !== 'createdAt') {
+        invoice[key] = req.body[key];
+      }
+    });
+    
+    await invoice.save();
+    res.json(invoice);
+  } catch (err) {
+    console.error('Error updating invoice:', err);
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({ message: err.message });
+    }
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Vérifier l'existence d'un devis pour un ticket
+router.get('/quote/check/:ticketId', async (req, res) => {
+  try {
+    const { Quote } = getModels();
+    const { ticketId } = req.params;
+    
+    const quote = await Quote.findOne({ ticket: ticketId });
+    if (quote) {
+      return res.json({
+        exists: true,
+        isLocked: quote.isLocked || false,
+        quoteId: quote._id,
+        quoteNumber: quote.quoteNumber
+      });
+    }
+    
+    return res.json({ exists: false, isLocked: false });
+  } catch (error) {
+    console.error('Error checking quote for ticket:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Générer le HTML d'un devis spécifique
+router.get('/quote/html/:quoteId', async (req, res) => {
+  try {
+    const { Quote, Ticket, User } = getModels();
+    const quote = await Quote.findById(req.params.quoteId).populate('client');
+    if (!quote) return res.status(404).send('Quote not found');
+
+    // Lis le template HTML
+    const templatePath = path.join(__dirname, '../templates/invoiceTemplate.html');
+    const templateSource = fs.readFileSync(templatePath, 'utf8');
+    const template = Handlebars.compile(templateSource);
+
+    // Prépare les données à partir du devis sauvegardé
+    const html = template({
+      ...quote.toObject(),
+      isQuote: true // Flag pour différencier du template facture
+    });
+
+    res.send(html);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Erreur serveur');
+  }
 });
 
 module.exports = router; 

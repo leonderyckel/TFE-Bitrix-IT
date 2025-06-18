@@ -522,8 +522,7 @@ function AdminTicketDetails() {
                                 size="small"
                                 variant="outlined"
                                 onClick={async () => {
-                                  const description = window.prompt(`Add description for ${step.label} step:`, `${step.label} completed`);
-                                  if (description !== null && selectedTechnicianForAssign) {
+                                  if (selectedTechnicianForAssign) {
                                     try {
                                       setSubmitting(true);
                                       setError(null);
@@ -556,10 +555,7 @@ function AdminTicketDetails() {
                               size="small"
                               variant="outlined"
                               onClick={() => {
-                                const description = window.prompt(`Add description for ${step.label} step:`);
-                                 if (description !== null) {
-                                  handleUpdateProgress(step.value, description || `${step.label} completed`);
-                                }
+                                handleUpdateProgress(step.value, `${step.label} completed`);
                               }}
                               disabled={submitting}
                             >
@@ -587,8 +583,22 @@ function AdminTicketDetails() {
                           </ListItemAvatar>
                           <ListItemText
                             primary={
-                              <Typography variant="subtitle2">
-                                {allProgressSteps.find(s => s.value === progress.status)?.label || progress.status}
+                              <Typography 
+                                variant="subtitle2"
+                                sx={{
+                                  color: (progress.status === 'quote-sent' && 
+                                          ticket.quoteDetails?.accepted && 
+                                          ticket.quoteDetails?.paid) 
+                                    ? 'success.main' 
+                                    : 'inherit'
+                                }}
+                              >
+                                {progress.status === 'quote-sent' && 
+                                 ticket.quoteDetails?.accepted && 
+                                 ticket.quoteDetails?.paid 
+                                  ? 'Quote Accepted & Paid by Client'
+                                  : (allProgressSteps.find(s => s.value === progress.status)?.label || progress.status)
+                                }
                               </Typography>
                             }
                             secondary={
