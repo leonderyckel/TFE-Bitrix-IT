@@ -112,16 +112,16 @@ const components = {
     // On pourrait aussi surcharger KeyboardShortcutsDialog ici si besoin
 };
 
-// [3] URLs des icônes : Utilise les URLs directes des SVG Lucide depuis unpkg
+// [3] URLs des icônes : Utilise des data URLs avec du SVG inline pour éviter les problèmes de CSP
 const customAssetUrls = {
 	icons: {
-        // Utilise les noms d'icônes de lucide-static
-		'printer-tool-icon': 'https://unpkg.com/lucide-static@latest/icons/printer.svg', 
-        'server-tool-icon': 'https://unpkg.com/lucide-static@latest/icons/server.svg',
-        'computer-tool-icon': 'https://unpkg.com/lucide-static@latest/icons/laptop.svg',
-        'desktop-tool-icon': 'https://unpkg.com/lucide-static@latest/icons/monitor.svg',
-        'phone-tool-icon': 'https://unpkg.com/lucide-static@latest/icons/smartphone.svg',
-        'cable-tool-icon': 'https://unpkg.com/lucide-static@latest/icons/plug-zap.svg',
+        // Icônes SVG simples en data URLs - correctement encodées
+		'printer-tool-icon': 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"%3E%3Crect x="6" y="4" width="12" height="6" rx="1"/%3E%3Crect x="6" y="14" width="12" height="6" rx="1"/%3E%3Cpath d="M6 14h12"/%3E%3Cpath d="M8 18h8"/%3E%3C/svg%3E',
+        'server-tool-icon': 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"%3E%3Crect x="2" y="3" width="20" height="4" rx="1"/%3E%3Crect x="2" y="9" width="20" height="4" rx="1"/%3E%3Crect x="2" y="15" width="20" height="4" rx="1"/%3E%3Ccircle cx="6" cy="5" r="1"/%3E%3Ccircle cx="6" cy="11" r="1"/%3E%3Ccircle cx="6" cy="17" r="1"/%3E%3C/svg%3E',
+        'computer-tool-icon': 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"%3E%3Crect x="2" y="3" width="20" height="14" rx="2"/%3E%3Cpath d="M8 21h8"/%3E%3Cpath d="M12 17v4"/%3E%3C/svg%3E',
+        'desktop-tool-icon': 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"%3E%3Crect x="2" y="3" width="20" height="14" rx="2"/%3E%3Cline x1="8" x2="16" y1="21" y2="21"/%3E%3Cline x1="12" x2="12" y1="17" y2="21"/%3E%3C/svg%3E',
+        'phone-tool-icon': 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"%3E%3Crect x="5" y="2" width="14" height="20" rx="2"/%3E%3Cpath d="M12 18h.01"/%3E%3C/svg%3E',
+        'cable-tool-icon': 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"%3E%3Cpath d="M12 2v4"/%3E%3Cpath d="M12 18v4"/%3E%3Cpath d="M4.93 4.93l2.83 2.83"/%3E%3Cpath d="M16.24 16.24l2.83 2.83"/%3E%3Cpath d="M2 12h4"/%3E%3Cpath d="M18 12h4"/%3E%3Cpath d="M4.93 19.07l2.83-2.83"/%3E%3Cpath d="M16.24 7.76l2.83-2.83"/%3E%3C/svg%3E',
 	},
 };
 

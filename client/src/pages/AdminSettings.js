@@ -29,10 +29,7 @@ const adminValidationSchema = yup.object({
     .matches(/[a-z]/, 'Password must contain at least one lowercase letter')
     .matches(/[0-9]/, 'Password must contain at least one number')
     .matches(/[^A-Za-z0-9]/, 'Password must contain at least one special character')
-    .when('isEditing', {
-      is: false,
-      then: (schema) => schema.required('Password is required')
-    }),
+    .required('Password is required'),
   role: yup.string().required('Role is required')
 });
 
@@ -45,7 +42,6 @@ function AdminSettings() {
   const [success, setSuccess] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [editingAdmin, setEditingAdmin] = useState(null);
   const [adminToDelete, setAdminToDelete] = useState(null);
   const [counters, setCounters] = useState({
     invoiceCounter: 0,
@@ -53,7 +49,7 @@ function AdminSettings() {
   });
   const navigate = useNavigate();
 
-  // Formik pour la création/modification d'admin
+  // Formik pour la création d'admin
   const formik = useFormik({
     initialValues: {
       firstName: '',
@@ -61,55 +57,31 @@ function AdminSettings() {
       email: '',
       password: '',
       role: 'technician',
-      isActive: true,
-      isEditing: false
+      isActive: true
     },
     validationSchema: adminValidationSchema,
     onSubmit: async (values, { resetForm }) => {
       try {
         setLoading(true);
-        const submitData = { ...values };
-        delete submitData.isEditing;
         
-        // Si on édite et qu'il n'y a pas de password, on l'enlève
-        if (editingAdmin && !submitData.password) {
-          delete submitData.password;
-        }
+        const response = await axios.post(
+          `${API_URL}/admin/admins`,
+          values,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
         
-        let response;
-        if (editingAdmin) {
-          response = await axios.put(
-            `${API_URL}/admin/admins/${editingAdmin._id}`,
-            submitData,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`
-              }
-            }
-          );
-          setAdmins(prev => prev.map(admin => 
-            admin._id === editingAdmin._id ? response.data : admin
-          ));
-          setSuccess('Admin user updated successfully!');
-        } else {
-          response = await axios.post(
-            `${API_URL}/admin/admins`,
-            submitData,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`
-              }
-            }
-          );
-          setAdmins(prev => [...prev, response.data]);
-          setSuccess('Admin user created successfully!');
-        }
+        setAdmins(prev => [...prev, response.data]);
+        setSuccess('Admin user created successfully!');
         
         handleCloseDialog();
         resetForm();
       } catch (error) {
-        console.error('Error saving admin user:', error);
-        setError('Failed to save admin user. ' + (error.response?.data?.message || error.message));
+        console.error('Error creating admin user:', error);
+        setError('Failed to create admin user. ' + (error.response?.data?.message || error.message));
       } finally {
         setLoading(false);
       }
@@ -185,27 +157,10 @@ function AdminSettings() {
   };
 
   const handleOpenDialog = () => {
-    setEditingAdmin(null);
     setOpenDialog(true);
     setError(null);
     setSuccess(null);
     formik.resetForm();
-  };
-
-  const handleEditAdmin = (admin) => {
-    setEditingAdmin(admin);
-    formik.setValues({
-      firstName: admin.firstName,
-      lastName: admin.lastName,
-      email: admin.email,
-      password: '',
-      role: admin.role,
-      isActive: admin.isActive,
-      isEditing: true
-    });
-    setOpenDialog(true);
-    setError(null);
-    setSuccess(null);
   };
 
   const handleDeleteAdmin = (admin) => {
@@ -238,7 +193,6 @@ function AdminSettings() {
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
-    setEditingAdmin(null);
     formik.resetForm();
   };
 
@@ -342,9 +296,6 @@ function AdminSettings() {
                             {admin.lastLogin ? new Date(admin.lastLogin).toLocaleString() : 'Never'}
                           </TableCell>
                           <TableCell>
-                            <IconButton color="primary" title="Edit User" onClick={() => handleEditAdmin(admin)}>
-                              <EditIcon />
-                            </IconButton>
                             {admin._id !== user?._id && (
                               <IconButton color="error" title="Delete User" onClick={() => handleDeleteAdmin(admin)}>
                                 <DeleteIcon />
@@ -474,7 +425,7 @@ function AdminSettings() {
       {/* Dialog for adding new admin */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <form onSubmit={formik.handleSubmit}>
-          <DialogTitle>{editingAdmin ? 'Edit Admin/Technician' : 'Add New Admin/Technician'}</DialogTitle>
+          <DialogTitle>Add New Admin/Technician</DialogTitle>
           <DialogContent>
             <Grid container spacing={2} sx={{ mt: 1 }}>
               <Grid item xs={12} md={6}>
@@ -514,7 +465,7 @@ function AdminSettings() {
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label={editingAdmin ? "Password (leave empty to keep current)" : "Password"}
+                  label="Password"
                   name="password"
                   type="password"
                   value={formik.values.password}
@@ -564,7 +515,7 @@ function AdminSettings() {
               color="primary"
               disabled={formik.isSubmitting || !formik.isValid}
             >
-              {formik.isSubmitting ? <CircularProgress size={24} /> : (editingAdmin ? 'Update User' : 'Add User')}
+              {formik.isSubmitting ? <CircularProgress size={24} /> : 'Add User'}
             </Button>
           </DialogActions>
         </form>

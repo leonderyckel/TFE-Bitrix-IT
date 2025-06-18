@@ -24,12 +24,16 @@ import { useSnackbar } from 'notistack';
 import PrinterNode from '../components/diagramNodes/PrinterNode';
 import ServerNode from '../components/diagramNodes/ServerNode';
 import ComputerNode from '../components/diagramNodes/ComputerNode';
+import RouterNode from '../components/diagramNodes/RouterNode';
+import SwitchNode from '../components/diagramNodes/SwitchNode';
 import Sidebar from '../components/Sidebar';
 
 const nodeTypes = {
     printer: PrinterNode,
     server: ServerNode,
     computer: ComputerNode,
+    router: RouterNode,
+    switch: SwitchNode,
 };
 
 let id = 0;
@@ -45,7 +49,36 @@ const DiagramEditor = ({ initialDiagramData, companyName }) => {
     const [isSaving, setIsSaving] = useState(false);
     const navigate = useNavigate();
 
-    useEffect(() => { /* ... (fitView) ... */ }, [fitView, initialDiagramData]);
+    // Function to handle node updates (label and IP changes)
+    const handleNodeUpdate = useCallback((nodeId, newData) => {
+        setNodes((nds) => 
+            nds.map((node) => 
+                node.id === nodeId 
+                    ? { ...node, data: newData }
+                    : node
+            )
+        );
+    }, [setNodes]);
+
+    // Add onNodeUpdate to all nodes data
+    const nodesWithUpdate = useMemo(() => {
+        return nodes.map(node => ({
+            ...node,
+            data: {
+                ...node.data,
+                onNodeUpdate: handleNodeUpdate
+            }
+        }));
+    }, [nodes, handleNodeUpdate]);
+
+    useEffect(() => { 
+        if (initialDiagramData?.nodes && initialDiagramData.nodes.length > 0) {
+            setTimeout(() => {
+                fitView();
+            }, 100);
+        }
+    }, [fitView, initialDiagramData]);
+
     const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
     
     const handleSaveDiagram = async () => {
@@ -88,11 +121,15 @@ const DiagramEditor = ({ initialDiagramData, companyName }) => {
                 id: getId(),
                 type,
                 position,
-                data: { label: `${type} node` },
+                data: { 
+                    label: `${type} node`,
+                    ip: '',
+                    onNodeUpdate: handleNodeUpdate
+                },
             };
             setNodes((nds) => nds.concat(newNode));
         },
-        [project, setNodes]
+        [project, setNodes, handleNodeUpdate]
     );
 
     const decodedCompanyName = decodeURIComponent(companyName || '');
@@ -127,7 +164,7 @@ const DiagramEditor = ({ initialDiagramData, companyName }) => {
                         </Button>
                     </Box>
                     <ReactFlow
-                        nodes={nodes}
+                        nodes={nodesWithUpdate}
                         edges={edges}
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}

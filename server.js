@@ -141,7 +141,7 @@ app.use((req, res, next) => {
   req.io = io;
   res.setHeader(
     'Content-Security-Policy',
-    "img-src 'self' data: https://i.imgur.com;"
+    "img-src 'self' data: https://i.imgur.com https://unpkg.com;"
   );
   res.setHeader(
     'Permissions-Policy',

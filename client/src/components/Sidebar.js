@@ -3,12 +3,16 @@ import { Box, Typography, Paper } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import StorageIcon from '@mui/icons-material/Storage';
 import ComputerIcon from '@mui/icons-material/Computer';
+import RouterIcon from '@mui/icons-material/Router';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 
 // Les types de nœuds disponibles
 const nodeTypes = [
     { type: 'printer', label: 'Printer', icon: <PrintIcon /> },
     { type: 'server', label: 'Server', icon: <StorageIcon /> },
     { type: 'computer', label: 'Computer', icon: <ComputerIcon /> },
+    { type: 'router', label: 'Router', icon: <RouterIcon /> },
+    { type: 'switch', label: 'Switch', icon: <AccountTreeIcon /> },
     // Ajouter d'autres types ici (Switch, Router, Firewall...)
 ];
 

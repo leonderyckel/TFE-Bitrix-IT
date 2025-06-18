@@ -1,15 +1,15 @@
 import React, { memo, useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import { Card, CardContent, Typography, Box, TextField, IconButton } from '@mui/material';
-import PrintIcon from '@mui/icons-material/Print';
+import RouterIcon from '@mui/icons-material/Router';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 
-const PrinterNode = ({ data, id }) => {
+const RouterNode = ({ data, id }) => {
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [isEditingIP, setIsEditingIP] = useState(false);
-  const [tempLabel, setTempLabel] = useState(data?.label || 'Printer');
+  const [tempLabel, setTempLabel] = useState(data?.label || 'Router');
   const [tempIP, setTempIP] = useState(data?.ip || '');
 
   const handleLabelSave = () => {
@@ -27,7 +27,7 @@ const PrinterNode = ({ data, id }) => {
   };
 
   const handleLabelCancel = () => {
-    setTempLabel(data?.label || 'Printer');
+    setTempLabel(data?.label || 'Router');
     setIsEditingLabel(false);
   };
 
@@ -42,18 +42,18 @@ const PrinterNode = ({ data, id }) => {
         sx={{ 
             minWidth: 140, 
             maxWidth: 200, 
-            border: '2px solid #777', 
+            border: '2px solid #4a90e2', 
             borderRadius: '8px', 
-            backgroundColor: 'white', 
+            backgroundColor: '#e6f3ff', 
             textAlign: 'center',
             '&:hover': {
-              boxShadow: '0 4px 8px rgba(119, 119, 119, 0.3)'
+              boxShadow: '0 4px 8px rgba(74, 144, 226, 0.3)'
             }
         }}
     >
       <CardContent sx={{ padding: '8px !important' }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <PrintIcon fontSize="medium" sx={{ mb: 0.5, color: '#777' }} />
+          <RouterIcon fontSize="medium" sx={{ mb: 0.5, color: '#4a90e2' }} />
           
           {/* Label editing */}
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
@@ -80,7 +80,7 @@ const PrinterNode = ({ data, id }) => {
             ) : (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Typography variant="caption" sx={{ fontWeight: 'bold', wordBreak: 'break-word' }}>
-                  {data?.label || 'Printer'}
+                  {data?.label || 'Router'}
                 </Typography>
                 <IconButton size="small" onClick={() => setIsEditingLabel(true)}>
                   <EditIcon fontSize="small" />
@@ -125,10 +125,12 @@ const PrinterNode = ({ data, id }) => {
           </Box>
         </Box>
       </CardContent>
-      <Handle type="target" position={Position.Top} style={{ background: '#777' }} />
-      <Handle type="source" position={Position.Bottom} style={{ background: '#777' }} />
+      <Handle type="target" position={Position.Top} style={{ background: '#4a90e2' }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: '#4a90e2' }} />
+      <Handle type="target" position={Position.Left} style={{ background: '#4a90e2' }} />
+      <Handle type="source" position={Position.Right} style={{ background: '#4a90e2' }} />
     </Card>
   );
 };
 
-export default memo(PrinterNode); 
+export default memo(RouterNode); 
