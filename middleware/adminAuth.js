@@ -59,6 +59,12 @@ const adminAuth = async (req, res, next) => {
       return res.status(401).json({ message: 'Admin not found' });
     }
 
+    // Vérifier si l'admin est actif
+    if (!admin.isActive) {
+      console.log('Admin auth: Admin account is inactive');
+      return res.status(401).json({ message: 'Account is inactive. Please contact an administrator.' });
+    }
+
     // Ajouter l'admin à la requête
     req.admin = admin;
     

@@ -190,6 +190,12 @@ router.post('/login', (req, res, next) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // Vérifier si l'admin est actif
+    if (!admin.isActive) {
+      console.log('Admin account is inactive');
+      return res.status(401).json({ message: 'Account is inactive. Please contact an administrator.' });
+    }
+
     // Création du token avec l'information isAdmin: true
     const token = jwt.sign(
       { 
@@ -2794,8 +2800,8 @@ router.get('/invoice/preview/:ticketId', async (req, res) => {
     const ticket = await Ticket.findById(req.params.ticketId).populate('client');
     if (!ticket) return res.status(404).send('Ticket not found');
 
-    // Numéro de facture incrémental
-    const nextNumber = await getNextInvoiceNumber(getModels);
+    // Numéro de facture incrémental - PREVIEW SEULEMENT (sans incrémenter)
+    const nextNumber = await getNextInvoiceNumberPreview(getModels);
     const invoiceNumber = `INV${String(nextNumber).padStart(3, '0')}`;
 
     // Lis le template HTML
@@ -2863,8 +2869,8 @@ router.get('/quote/preview/:ticketId', async (req, res) => {
     const ticket = await Ticket.findById(req.params.ticketId).populate('client');
     if (!ticket) return res.status(404).send('Ticket not found');
 
-    // Numéro de devis incrémental
-    const nextNumber = await getNextQuoteNumber(getModels);
+    // Numéro de devis incrémental - PREVIEW SEULEMENT (sans incrémenter)
+    const nextNumber = await getNextQuoteNumberPreview(getModels);
     const quoteNumber = `QTE${String(nextNumber).padStart(3, '0')}`;
 
     // Lis le template HTML (utilise le même template que les factures)
@@ -2984,6 +2990,26 @@ async function getNextQuoteNumber(getModels) {
   return counter.seq;
 }
 
+// Fonction pour obtenir le prochain numéro de facture sans l'incrémenter
+async function getNextInvoiceNumberPreview(getModels) {
+  const { InvoiceCounter } = getModels();
+  let counter = await InvoiceCounter.findOne({ name: 'invoice' });
+  if (!counter) {
+    counter = await InvoiceCounter.create({ name: 'invoice', seq: 1 });
+  }
+  return counter.seq + 1; // Retourne le prochain numéro sans incrémenter
+}
+
+// Fonction pour obtenir le prochain numéro de devis sans l'incrémenter
+async function getNextQuoteNumberPreview(getModels) {
+  const { QuoteCounter } = getModels();
+  let counter = await QuoteCounter.findOne({ name: 'quote' });
+  if (!counter) {
+    counter = await QuoteCounter.create({ name: 'quote', seq: 1 });
+  }
+  return counter.seq + 1; // Retourne le prochain numéro sans incrémenter
+}
+
 router.post('/invoice', async (req, res) => {
   try {
     const { Invoice } = getModels();
@@ -3003,11 +3029,6 @@ router.post('/invoice', async (req, res) => {
     console.log('Cleaned invoice data:', JSON.stringify(cleanedData, null, 2));
     
     // Vérifier que les champs requis sont présents
-    if (!cleanedData.invoiceNumber) {
-      console.log('ERROR: Missing invoice number');
-      return res.status(400).json({ message: 'Invoice number is required.' });
-    }
-    
     if (!cleanedData.ticket) {
       console.log('ERROR: Missing ticket ID');
       return res.status(400).json({ message: 'Ticket ID is required.' });
@@ -3017,14 +3038,6 @@ router.post('/invoice', async (req, res) => {
       console.log('ERROR: Missing client ID');
       return res.status(400).json({ message: 'Client ID is required.' });
     }
-    
-    // Vérifie qu'il n'y a pas déjà une facture avec ce numéro
-    const existingByNumber = await Invoice.findOne({ invoiceNumber: cleanedData.invoiceNumber });
-    if (existingByNumber) {
-      console.log('ERROR: Invoice number already exists:', cleanedData.invoiceNumber);
-      return res.status(400).json({ message: 'Invoice number already exists.' });
-    }
-    console.log('✓ Invoice number is unique:', cleanedData.invoiceNumber);
     
     // Vérifie qu'il n'y a pas déjà une facture pour ce ticket
     const existingByTicket = await Invoice.findOne({ ticket: cleanedData.ticket });
@@ -3039,8 +3052,15 @@ router.post('/invoice', async (req, res) => {
     }
     console.log('✓ No existing invoice for ticket:', cleanedData.ticket);
     
+    // Obtenir et incrémenter le compteur pour le numéro de facture FINAL
+    const nextNumber = await getNextInvoiceNumber(getModels);
+    const finalInvoiceNumber = `INV${String(nextNumber).padStart(3, '0')}`;
+    
+    console.log('✓ Generated final invoice number:', finalInvoiceNumber);
+    
     const invoice = new Invoice({
       ...cleanedData,
+      invoiceNumber: finalInvoiceNumber, // Utiliser le numéro final incrémenté
       isLocked: true // Verrouiller immédiatement pour conformité légale
     });
     
@@ -3089,11 +3109,6 @@ router.post('/quote', async (req, res) => {
     console.log('Cleaned quote data:', JSON.stringify(cleanedData, null, 2));
     
     // Vérifier que les champs requis sont présents
-    if (!cleanedData.invoiceNumber) { // Utilise le même champ pour le numéro de devis
-      console.log('ERROR: Missing quote number');
-      return res.status(400).json({ message: 'Quote number is required.' });
-    }
-    
     if (!cleanedData.ticket) {
       console.log('ERROR: Missing ticket ID');
       return res.status(400).json({ message: 'Ticket ID is required.' });
@@ -3103,14 +3118,6 @@ router.post('/quote', async (req, res) => {
       console.log('ERROR: Missing client ID');
       return res.status(400).json({ message: 'Client ID is required.' });
     }
-    
-    // Vérifie qu'il n'y a pas déjà un devis avec ce numéro
-    const existingByNumber = await Quote.findOne({ quoteNumber: cleanedData.invoiceNumber });
-    if (existingByNumber) {
-      console.log('ERROR: Quote number already exists:', cleanedData.invoiceNumber);
-      return res.status(400).json({ message: 'Quote number already exists.' });
-    }
-    console.log('✓ Quote number is unique:', cleanedData.invoiceNumber);
     
     // Vérifie qu'il n'y a pas déjà un devis pour ce ticket
     const existingByTicket = await Quote.findOne({ ticket: cleanedData.ticket });
@@ -3125,9 +3132,15 @@ router.post('/quote', async (req, res) => {
     }
     console.log('✓ No existing quote for ticket:', cleanedData.ticket);
     
+    // Obtenir et incrémenter le compteur pour le numéro de devis FINAL
+    const nextNumber = await getNextQuoteNumber(getModels);
+    const finalQuoteNumber = `QTE${String(nextNumber).padStart(3, '0')}`;
+    
+    console.log('✓ Generated final quote number:', finalQuoteNumber);
+    
     const quote = new Quote({
       ...cleanedData,
-      quoteNumber: cleanedData.invoiceNumber, // Stocker le numéro de devis
+      quoteNumber: finalQuoteNumber, // Utiliser le numéro final incrémenté
       isLocked: true // Verrouiller immédiatement pour conformité légale
     });
     

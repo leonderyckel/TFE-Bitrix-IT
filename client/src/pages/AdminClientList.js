@@ -23,11 +23,12 @@ import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import * as yup from 'yup';
 import { useFormik } from 'formik';
+import { emailValidationTest } from '../utils/emailValidation';
 
 const clientValidationSchema = yup.object({
   firstName: yup.string().required('First name is required'),
   lastName: yup.string().required('Last name is required'),
-  email: yup.string().email('Enter a valid email').required('Email is required'),
+  email: yup.string().test('email', 'Enter a valid email', emailValidationTest).required('Email is required'),
   company: yup.string(),
   vat: yup.string(),
   password: yup.string().when('isEditing', {

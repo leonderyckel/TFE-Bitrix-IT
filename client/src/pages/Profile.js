@@ -13,11 +13,12 @@ import PersonIcon from '@mui/icons-material/Person';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
+import { emailValidationTest } from '../utils/emailValidation';
 
 const validationSchema = yup.object({
   firstName: yup.string().required('First name is required'),
   lastName: yup.string().required('Last name is required'),
-  email: yup.string().email('Enter a valid email').required('Email is required'),
+  email: yup.string().test('email', 'Enter a valid email', emailValidationTest).required('Email is required'),
   company: yup.string(),
   vat: yup.string(),
   address: yup.string(),

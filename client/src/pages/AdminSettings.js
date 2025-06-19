@@ -18,11 +18,12 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import * as yup from 'yup';
 import { useFormik } from 'formik';
+import { emailValidationTest } from '../utils/emailValidation';
 
 const adminValidationSchema = yup.object({
   firstName: yup.string().required('First name is required'),
   lastName: yup.string().required('Last name is required'),
-  email: yup.string().email('Enter a valid email').required('Email is required'),
+  email: yup.string().test('email', 'Enter a valid email', emailValidationTest).required('Email is required'),
   password: yup.string()
     .min(8, 'Password must be at least 8 characters long')
     .matches(/[A-Z]/, 'Password must contain at least one uppercase letter')
@@ -42,7 +43,9 @@ function AdminSettings() {
   const [success, setSuccess] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [openEditStatusDialog, setOpenEditStatusDialog] = useState(false);
   const [adminToDelete, setAdminToDelete] = useState(null);
+  const [adminToEdit, setAdminToEdit] = useState(null);
   const [counters, setCounters] = useState({
     invoiceCounter: 0,
     quoteCounter: 0
@@ -201,6 +204,57 @@ function AdminSettings() {
     setAdminToDelete(null);
   };
 
+  const handleEditStatus = (admin) => {
+    setAdminToEdit(admin);
+    setOpenEditStatusDialog(true);
+  };
+
+  const handleCloseEditStatusDialog = () => {
+    setOpenEditStatusDialog(false);
+    setAdminToEdit(null);
+  };
+
+  const handleStatusToggle = async () => {
+    if (!adminToEdit) return;
+    
+    try {
+      setLoading(true);
+      const newStatus = !adminToEdit.isActive;
+      
+      const response = await axios.put(
+        `${API_URL}/admin/admins/${adminToEdit._id}`,
+        {
+          firstName: adminToEdit.firstName,
+          lastName: adminToEdit.lastName,
+          email: adminToEdit.email,
+          role: adminToEdit.role,
+          isActive: newStatus,
+          permissions: adminToEdit.permissions || []
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      
+      setAdmins(prev => prev.map(admin => 
+        admin._id === adminToEdit._id 
+          ? { ...admin, isActive: newStatus }
+          : admin
+      ));
+      
+      setSuccess(`Admin user ${newStatus ? 'activated' : 'deactivated'} successfully!`);
+      setOpenEditStatusDialog(false);
+      setAdminToEdit(null);
+    } catch (error) {
+      console.error('Error updating admin status:', error);
+      setError('Failed to update admin status. ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getRoleChip = (role) => {
     switch (role) {
       case 'admin':
@@ -297,9 +351,14 @@ function AdminSettings() {
                           </TableCell>
                           <TableCell>
                             {admin._id !== user?._id && (
-                              <IconButton color="error" title="Delete User" onClick={() => handleDeleteAdmin(admin)}>
-                                <DeleteIcon />
-                              </IconButton>
+                              <>
+                                <IconButton color="error" title="Delete User" onClick={() => handleDeleteAdmin(admin)}>
+                                  <DeleteIcon />
+                                </IconButton>
+                                <IconButton color="primary" title="Edit Status" onClick={() => handleEditStatus(admin)}>
+                                  <EditIcon />
+                                </IconButton>
+                              </>
                             )}
                           </TableCell>
                         </TableRow>
@@ -535,6 +594,57 @@ function AdminSettings() {
           </Button>
           <Button onClick={confirmDeleteAdmin} color="error" autoFocus>
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog for editing admin status */}
+      <Dialog open={openEditStatusDialog} onClose={handleCloseEditStatusDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Admin Status</DialogTitle>
+        <DialogContent>
+          {adminToEdit && (
+            <>
+              <Typography variant="h6" gutterBottom>
+                {adminToEdit.firstName} {adminToEdit.lastName}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                {adminToEdit.email}
+              </Typography>
+              <Typography variant="body1" sx={{ mt: 2, mb: 2 }}>
+                Current Status: 
+                <Chip 
+                  label={adminToEdit.isActive ? "Active" : "Inactive"} 
+                  color={adminToEdit.isActive ? "success" : "default"} 
+                  sx={{ ml: 1 }}
+                />
+              </Typography>
+              <Typography>
+                Are you sure you want to {adminToEdit.isActive ? 'deactivate' : 'activate'} this admin user?
+                {!adminToEdit.isActive && (
+                  <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
+                    ⚠️ Activating this user will allow them to log in again.
+                  </Typography>
+                )}
+                {adminToEdit.isActive && (
+                  <Typography variant="body2" color="error.main" sx={{ mt: 1 }}>
+                    ⚠️ Deactivating this user will prevent them from logging in.
+                  </Typography>
+                )}
+              </Typography>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEditStatusDialog} color="primary">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleStatusToggle} 
+            color={adminToEdit?.isActive ? "error" : "success"} 
+            variant="contained"
+            autoFocus
+          >
+            {adminToEdit?.isActive ? 'Deactivate' : 'Activate'}
           </Button>
         </DialogActions>
       </Dialog>

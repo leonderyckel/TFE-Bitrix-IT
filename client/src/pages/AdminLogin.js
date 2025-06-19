@@ -14,11 +14,12 @@ import { useFormik } from 'formik';
 import * as yup from 'yup';
 import { adminLogin } from '../store/slices/authSlice';
 import Logo from '../components/Logo';
+import { emailValidationTest } from '../utils/emailValidation';
 
 const validationSchema = yup.object({
   email: yup
     .string()
-    .email('Enter a valid email')
+    .test('email', 'Enter a valid email', emailValidationTest)
     .required('Email is required'),
   password: yup
     .string()

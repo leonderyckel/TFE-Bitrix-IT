@@ -15,11 +15,12 @@ import {
 import { useFormik } from 'formik';
 import * as yup from 'yup';
 import { register, loginSuccess } from '../store/slices/authSlice';
+import { emailValidationTest } from '../utils/emailValidation';
 
 const validationSchema = yup.object({
   email: yup
     .string()
-    .email('Please enter a valid email address')
+    .test('email', 'Please enter a valid email address', emailValidationTest)
     .required('Email is required'),
   password: yup
     .string()
